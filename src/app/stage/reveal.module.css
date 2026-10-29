@@ -133,7 +133,7 @@
   font-size: 56px;
   font-weight: 800;
   color: #fde68a;
-  animation: rise 600ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+  animation: rise 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .winLabel svg {
@@ -149,7 +149,7 @@
   background: rgb(255 255 255 / 0.07);
   border: 4px solid var(--g2);
   box-shadow: 0 20px 60px rgb(0 0 0 / 0.5);
-  animation: flip 900ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  animation: flip 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
   backface-visibility: hidden;
 }
 
@@ -159,7 +159,7 @@
     0 0 0 6px rgb(252 211 77 / 0.25),
     0 0 120px rgb(252 211 77 / 0.35),
     0 30px 80px rgb(0 0 0 / 0.6);
-  animation: flipBig 1100ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  animation: flipBig 1100ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .card img {
@@ -339,7 +339,7 @@
   text-align: center;
   background: rgb(255 255 255 / 0.07);
   border: 2px solid rgb(255 255 255 / 0.16);
-  animation: flip 900ms cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+  animation: flip 900ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .hallName {
