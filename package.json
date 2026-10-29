@@ -1,6 +1,6 @@
 {
   "name": "live-vote",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3154",
@@ -14,7 +14,9 @@
     "photos": "tsx scripts/make-photos.ts",
     "award": "tsx scripts/award.ts",
     "latency": "tsx scripts/measure-latency.ts",
-    "e2e": "tsx scripts/e2e-browser.ts"
+    "e2e": "tsx scripts/e2e-browser.ts",
+    "e2e:stage": "tsx scripts/e2e-stage.ts",
+    "bundle": "tsx scripts/measure-bundle.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -23,6 +25,7 @@
     "drizzle-orm": "^0.45.4",
     "next": "16.4.3",
     "pg": "^8.23.1",
+    "qrcode": "^1.5.4",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1"
@@ -31,6 +34,7 @@
     "@tailwindcss/turbopack": "^4",
     "@types/node": "^20",
     "@types/pg": "^8.23.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^18.0.9",

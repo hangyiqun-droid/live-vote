@@ -1,0 +1,742 @@
+/* Stage-only styles. Kept out of Tailwind (see `@source not` in globals.css) so nothing here
+   reaches the phone vote page. Animate transform + opacity only (SPEC 5.5). */
+
+.viewport {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: #05070f;
+  color: #fff;
+}
+
+.canvas {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1920px;
+  height: 1080px;
+  transform-origin: 0 0;
+  overflow: hidden;
+}
+
+/* Temporary background until the 🎨 image arrives: swap by setting --stage-bg to
+   url(/stage/bg.webp) center / cover no-repeat. Painted once, never animated. */
+.bg {
+  position: absolute;
+  inset: 0;
+  background:
+    var(
+      --stage-bg,
+      radial-gradient(1200px 700px at 18% 12%, rgb(56 66 160 / 0.55), transparent 70%),
+      radial-gradient(900px 600px at 92% 88%, rgb(190 60 40 / 0.35), transparent 70%),
+      radial-gradient(800px 500px at 70% 20%, rgb(16 140 120 / 0.25), transparent 70%),
+      linear-gradient(160deg, #0b1026 0%, #070a18 55%, #0d0a14 100%)
+    );
+}
+
+.bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.16;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ---------- message screens (loading, bad key) ---------- */
+
+.message {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 32px;
+  font-size: 44px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.message svg {
+  width: 72px;
+  height: 72px;
+  color: #fbbf24;
+}
+
+.progress {
+  width: 640px;
+  height: 14px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.12);
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #fbbf24, #f97316);
+  transform-origin: 0 50%;
+  transition: transform 200ms ease-out;
+}
+
+.muted {
+  font-size: 30px;
+  font-weight: 400;
+  color: rgb(255 255 255 / 0.6);
+}
+
+/* ---------- lobby ---------- */
+
+.lobbyTitle {
+  position: absolute;
+  top: 70px;
+  left: 0;
+  right: 0;
+  text-align: center;
+}
+
+.lobbyTitle p {
+  font-size: 34px;
+  color: rgb(255 255 255 / 0.65);
+  letter-spacing: 0.04em;
+}
+
+.lobbyTitle h1 {
+  margin-top: 8px;
+  font-size: 76px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.lobbyRows {
+  position: absolute;
+  top: 270px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  align-items: center;
+}
+
+.lobbyRow {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+
+.lobbyGroup {
+  width: 150px;
+  text-align: right;
+  font-size: 30px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.lobbyFace {
+  width: 96px;
+  height: 128px;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 3px solid var(--g);
+  box-shadow: 0 10px 30px rgb(0 0 0 / 0.45);
+  animation: float 7s ease-in-out infinite;
+  will-change: transform;
+}
+
+.lobbyFace img,
+.photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+@keyframes float {
+  0%,
+  100% {
+    transform: translateY(-7px);
+  }
+  50% {
+    transform: translateY(7px);
+  }
+}
+
+.lobbyWait {
+  position: absolute;
+  bottom: 70px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 46px;
+  font-weight: 700;
+  color: #fde68a;
+  animation: breathe 2.6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------- pending ---------- */
+
+.pending {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 120px;
+}
+
+.pendingCard {
+  max-width: 900px;
+  padding: 64px 72px;
+  border-radius: 40px;
+  background: rgb(255 255 255 / 0.07);
+  border: 2px solid rgb(255 255 255 / 0.16);
+  animation: cardIn 700ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+}
+
+.pendingCard p {
+  font-size: 34px;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.pendingCard h1 {
+  margin-top: 12px;
+  font-size: 104px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.pendingCard h2 {
+  margin-top: 20px;
+  font-size: 40px;
+  font-weight: 400;
+  color: rgb(255 255 255 / 0.8);
+}
+
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: scale(0.85) translateY(40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- QR panel ---------- */
+
+.qrPanel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 576px;
+  height: 1080px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 150px;
+  border-left: 1px solid rgb(255 255 255 / 0.08);
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.04), rgb(255 255 255 / 0.01));
+}
+
+.qrCard {
+  padding: 18px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
+  animation: cardIn 600ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+}
+
+.qrCard svg {
+  display: block;
+}
+
+.qrHint {
+  margin-top: 26px;
+  font-size: 30px;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.qrUrl {
+  margin-top: 4px;
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.totalLabel {
+  margin-top: 52px;
+  font-size: 30px;
+  color: rgb(255 255 255 / 0.7);
+}
+
+.total {
+  font-size: 120px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  will-change: transform;
+}
+
+.countdown {
+  margin-top: 28px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 64px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fde68a;
+}
+
+.countdown svg {
+  width: 52px;
+  height: 52px;
+}
+
+.countdownLow {
+  color: #fb923c;
+}
+
+/* ---------- race ---------- */
+
+.raceHeader {
+  position: absolute;
+  left: 56px;
+  top: 20px;
+  width: 1232px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.raceHeader p {
+  font-size: 28px;
+  color: rgb(255 255 255 / 0.6);
+}
+
+.raceHeader h1 {
+  font-size: 66px;
+  font-weight: 800;
+  line-height: 1.4;
+  animation: titleIn 600ms cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
+}
+
+@keyframes titleIn {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.status {
+  padding: 8px 22px;
+  border-radius: 999px;
+  font-size: 30px;
+  font-weight: 700;
+  background: rgb(52 211 153 / 0.18);
+  color: #6ee7b7;
+}
+
+.statusOff {
+  background: rgb(251 191 36 / 0.18);
+  color: #fde68a;
+}
+
+.lane,
+.photo,
+.stripItem {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition:
+    transform 600ms cubic-bezier(0.25, 0.9, 0.3, 1),
+    opacity 350ms ease;
+  will-change: transform;
+}
+
+.lane {
+  width: 1232px;
+  height: 88px;
+}
+
+.laneIn {
+  position: absolute;
+  inset: 0;
+  animation: laneIn 500ms cubic-bezier(0.2, 0.9, 0.3, 1.1) both;
+}
+
+@keyframes laneIn {
+  from {
+    opacity: 0;
+    transform: translateX(-60px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.laneBg {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.06);
+  border: 1px solid rgb(255 255 255 / 0.07);
+}
+
+.laneEmpty {
+  opacity: 0.4;
+}
+
+/* Gold wash for first place (persistent) */
+.gold {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  background: linear-gradient(90deg, rgb(251 191 36 / 0.32), rgb(251 191 36 / 0.06) 70%);
+  border: 2px solid rgb(251 191 36 / 0.7);
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+
+.leader .gold {
+  opacity: 1;
+}
+
+/* One-shot flash driven from JS (overtake / new leader) */
+.flash {
+  position: absolute;
+  inset: -4px;
+  border-radius: 22px;
+  background: rgb(255 255 255 / 0.28);
+  box-shadow: 0 0 40px rgb(255 255 255 / 0.5);
+  opacity: 0;
+}
+
+/* Closing-in: orange ring blinks (opacity only) */
+.chaseRing {
+  position: absolute;
+  inset: -2px;
+  border-radius: 20px;
+  border: 3px solid #fb923c;
+  opacity: 0;
+}
+
+.chasing .chaseRing {
+  animation: blink 900ms ease-in-out infinite;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.rank {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 56px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 36px;
+  font-weight: 800;
+  color: rgb(255 255 255 / 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.leader .rank {
+  color: #fcd34d;
+}
+
+.name {
+  position: absolute;
+  left: 146px;
+  top: 0;
+  width: 220px;
+  height: 88px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.nick {
+  font-size: 36px;
+  font-weight: 800;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.chip {
+  align-self: flex-start;
+  padding: 1px 12px;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  background: var(--g);
+}
+
+.track {
+  position: absolute;
+  left: 382px;
+  top: 26px;
+  width: 580px;
+  height: 36px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.07);
+  overflow: hidden;
+}
+
+.bar {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(90deg, var(--g), var(--g2));
+  transform-origin: 0 50%;
+  /* Spring-like overshoot (SPEC 5.2 "spring ~400 ms") without a JS animation loop */
+  transition: transform 450ms
+    linear(0, 0.22 9%, 0.62 20%, 0.95 32%, 1.08 42%, 1.1 48%, 1.06 58%, 1.01 70%, 0.995 82%, 1);
+  will-change: transform;
+}
+
+.flag {
+  position: absolute;
+  left: 974px;
+  top: 0;
+  width: 120px;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.fire {
+  width: 44px;
+  height: 44px;
+  color: #fb923c;
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+.chasing .fire {
+  opacity: 1;
+}
+
+.badge {
+  position: absolute;
+  padding: 4px 14px;
+  border-radius: 10px;
+  background: #f43f5e;
+  font-size: 26px;
+  font-weight: 800;
+  white-space: nowrap;
+  opacity: 0;
+}
+
+.count {
+  position: absolute;
+  right: 18px;
+  top: 0;
+  height: 88px;
+  display: flex;
+  align-items: center;
+  font-size: 50px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.photo {
+  width: 66px;
+  height: 88px;
+  transform-origin: 0 0;
+  z-index: 2;
+}
+
+.photoInner {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 3px solid var(--g);
+  background: var(--g);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.45);
+}
+
+.stripLine {
+  position: absolute;
+  left: 56px;
+  top: 928px;
+  width: 1232px;
+  height: 1px;
+  background: rgb(255 255 255 / 0.12);
+}
+
+.stripItem {
+  width: 58px;
+  text-align: center;
+}
+
+.stripNick {
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: rgb(255 255 255 / 0.8);
+  margin: 0 6px;
+  border-bottom: 3px solid var(--g2);
+}
+
+.stripCount {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.fx {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.dot {
+  position: absolute;
+  left: -9px;
+  top: -9px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 30%, rgb(253 224 71 / 0.9) 45%, rgb(253 224 71 / 0) 72%);
+}
+
+.emptyCall {
+  position: absolute;
+  left: 56px;
+  top: 168px;
+  width: 1232px;
+  height: 746px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 84px;
+  font-weight: 800;
+  color: #fde68a;
+  text-shadow: 0 8px 40px rgb(0 0 0 / 0.6);
+  z-index: 4;
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/* Closed / revealed: thin grey veil (a translucent layer, not a CSS filter) + stamp */
+.veil {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1344px;
+  height: 1080px;
+  background: rgb(15 18 30 / 0.45);
+  z-index: 5;
+  animation: fadeIn 400ms ease both;
+}
+
+.stamp {
+  position: absolute;
+  left: 672px;
+  top: 520px;
+  padding: 18px 56px;
+  border-radius: 24px;
+  border: 6px solid #fca5a5;
+  color: #fecaca;
+  background: rgb(127 29 29 / 0.75);
+  font-size: 88px;
+  font-weight: 800;
+  white-space: nowrap;
+  z-index: 6;
+  animation: stamp 500ms cubic-bezier(0.3, 1.4, 0.5, 1) both;
+}
+
+.stampReveal {
+  border-color: #fcd34d;
+  color: #fef3c7;
+  background: rgb(120 80 10 / 0.75);
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(2.2) rotate(-6deg);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(-6deg);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Effect warm-up layer (race-view WarmUp): drawn but practically invisible */
+.warm {
+  position: absolute;
+  inset: 0;
+  opacity: 0.004;
+  pointer-events: none;
+}
+
+/* ---------- connection banner ---------- */
+
+.banner {
+  position: absolute;
+  right: 24px;
+  bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 20px;
+  border-radius: 14px;
+  font-size: 24px;
+  background: rgb(30 41 59 / 0.92);
+  z-index: 10;
+}
+
+.banner svg {
+  width: 28px;
+  height: 28px;
+}
+
+.bannerLost {
+  background: #f97316;
+}
