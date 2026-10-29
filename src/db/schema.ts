@@ -1,0 +1,69 @@
+import {
+  pgTable, pgEnum, smallint, text, boolean, bigint, integer, uuid,
+  customType, primaryKey, timestamp, bigserial, check,
+} from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
+
+// SPEC 3. Business logic lives in PL/pgSQL functions (drizzle/0001_functions.sql).
+
+const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
+
+export const awardStatus = pgEnum("award_status", ["pending", "open", "closed", "revealed"]);
+
+export const awards = pgTable("awards", {
+  id: smallint("id").primaryKey(),
+  slug: text("slug").notNull().unique(),
+  title: text("title").notNull(),
+  subtitle: text("subtitle"),
+  sortOrder: smallint("sort_order").notNull(),
+  status: awardStatus("status").notNull().default("pending"),
+  openedAt: timestamp("opened_at", { withTimezone: true }),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  revealedAt: timestamp("revealed_at", { withTimezone: true }),
+  autoCloseAt: timestamp("auto_close_at", { withTimezone: true }),
+  // Bumps on every vote and status change — receivers drop messages older than what they have
+  seq: bigint("seq", { mode: "number" }).notNull().default(0),
+  // Bumps on reset so phones forget "you voted X" from the previous round
+  round: smallint("round").notNull().default(0),
+});
+
+// One row: the night itself
+export const events = pgTable("events", {
+  id: smallint("id").primaryKey().default(1),
+  title: text("title").notNull(),
+  currentAwardId: smallint("current_award_id").references(() => awards.id), // null = lobby
+  hideCounts: boolean("hide_counts").notNull().default(false),
+  // Bumps on every status/state change — orders event:event messages
+  version: bigint("version", { mode: "number" }).notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (t) => [check("events_singleton", sql`${t.id} = 1`)]);
+
+export const nominees = pgTable("nominees", {
+  id: smallint("id").primaryKey(),
+  nickname: text("nickname").notNull(),
+  firstName: text("first_name").notNull(),
+  grp: text("grp").notNull(),
+  active: boolean("active").notNull().default(true),
+}, (t) => [check("nominees_grp", sql`${t.grp} in ('AMBER','AZURE','JADE','RUBY')`)]);
+
+// "This device already voted for this award" — deliberately no nominee, no timestamp
+export const ballots = pgTable("ballots", {
+  awardId: smallint("award_id").notNull().references(() => awards.id),
+  deviceHash: bytea("device_hash").notNull(),
+  requestId: uuid("request_id").notNull(),
+}, (t) => [primaryKey({ columns: [t.awardId, t.deviceHash] })]);
+
+// Counting board — no device, no time
+export const tallies = pgTable("tallies", {
+  awardId: smallint("award_id").notNull().references(() => awards.id),
+  nomineeId: smallint("nominee_id").notNull().references(() => nominees.id),
+  votes: integer("votes").notNull().default(0),
+}, (t) => [primaryKey({ columns: [t.awardId, t.nomineeId] })]);
+
+// Admin actions only, never votes
+export const adminLog = pgTable("admin_log", {
+  id: bigserial("id", { mode: "number" }).primaryKey(),
+  action: text("action").notNull(),
+  awardId: smallint("award_id"),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});

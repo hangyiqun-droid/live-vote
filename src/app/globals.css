@@ -1,26 +1,33 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
+  --font-sans: var(--font-noto-thai), system-ui, sans-serif;
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* Group palette — placeholder until the 🎨 asset pass (SPEC 5.1) */
+  --color-amber: #c2410c;
+  --color-amber-soft: #ffedd5;
+  --color-azure: #0369a1;
+  --color-azure-soft: #e0f2fe;
+  --color-jade: #047857;
+  --color-jade-soft: #d1fae5;
+  --color-ruby: #b91c1c;
+  --color-ruby-soft: #fee2e2;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-sans);
+  -webkit-tap-highlight-color: transparent;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.4); opacity: 0; }
+  70% { transform: scale(1.12); opacity: 1; }
+  100% { transform: scale(1); }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
