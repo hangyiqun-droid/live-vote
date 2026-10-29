@@ -203,7 +203,7 @@
   border-radius: 40px;
   background: rgb(255 255 255 / 0.07);
   border: 2px solid rgb(255 255 255 / 0.16);
-  animation: cardIn 700ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+  animation: cardIn 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .pendingCard p {
@@ -257,7 +257,7 @@
   border-radius: 28px;
   background: #fff;
   box-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
-  animation: cardIn 600ms cubic-bezier(0.2, 0.9, 0.25, 1.2) both;
+  animation: cardIn 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .qrCard svg {
