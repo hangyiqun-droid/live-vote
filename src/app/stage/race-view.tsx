@@ -6,6 +6,7 @@ import { nomineeById, type Nominee } from "@/data/nominees";
 import { photoSrc } from "@/components/photo";
 import type { AwardState, TallySnapshot } from "@/lib/types";
 import { Count } from "./count";
+import { cue } from "./cues";
 import {
   BAR_W,
   BAR_X,
@@ -94,6 +95,11 @@ export function RaceView({
       showBadge(p?.badge);
     }
     if (change.newLeader !== null) zoomLane(parts.current.get(change.newLeader)?.inner);
+
+    // Sound hook points for M4 (SPEC 6.1, throttling rules in 6.4 belong to the player)
+    if (change.gained.size) cue("sfx_tick", { votes: [...change.gained.values()].reduce((a, b) => a + b, 0) });
+    if (change.newLeader !== null) cue("sfx_leader");
+    else if ([...change.overtook].some((id) => slotOf.get(id)!.slot < LANES)) cue("sfx_overtake");
   }, [live, hide]);
 
   // Stable so the memoised lanes only re-render when their own numbers change

@@ -5,12 +5,16 @@ import { ExclamationTriangleIcon, SignalSlashIcon } from "@heroicons/react/24/so
 import { nominees } from "@/data/nominees";
 import { photoSrc } from "@/components/photo";
 import { withBase } from "@/lib/base-path";
-import { createLiveFeed, type LiveStatus } from "@/lib/live";
+import { createStaffFeed, type LiveStatus } from "@/lib/live/staff";
 import type { EventState, TallySnapshot } from "@/lib/types";
 import { fetchWithTimeout } from "@/lib/uuid";
 import { Canvas } from "./canvas";
+import { cue } from "./cues";
+import { CountdownCues, OpenIntro } from "./moments";
 import type { QrProps } from "./qr-panel";
 import { RaceView } from "./race-view";
+import { Hall, Reveal } from "./reveal";
+import r from "./reveal.module.css";
 import { Lobby, Pending } from "./scenes";
 import s from "./stage.module.css";
 
@@ -23,7 +27,22 @@ type Phase = "loading" | "ready" | "no_key" | "bad_key";
 const newer = (a: TallySnapshot, b: TallySnapshot | undefined) =>
   !b || a.round > b.round || (a.round === b.round && a.seq > b.seq);
 
-export function StageClient({ qr }: { qr: QrProps }) {
+type Moments = { open: string | null; reveal: string | null; close: string | null };
+
+// A scene plays its entrance only when this screen saw the change happen live; a screen that
+// (re)loads mid-show lands on the current picture straight away (SPEC 6.3)
+function detectMoments(before: EventState, after: EventState, m: Moments): Moments {
+  const cur = after.awards.find((a) => a.id === after.current_award_id);
+  const was = before.awards.find((a) => a.id === cur?.id);
+  if (!cur || !was || was.round !== cur.round || was.status === cur.status) return m;
+  const key = `${cur.id}:${cur.round}:${after.version}`;
+  if (cur.status === "open" && was.status === "pending") return { ...m, open: key };
+  if (cur.status === "revealed") return { ...m, reveal: key };
+  if (cur.status === "closed" && was.status === "open") return { ...m, close: key };
+  return m;
+}
+
+export function StageClient({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProps | null }) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [state, setState] = useState<EventState | null>(null);
   const [clockOffset, setClockOffset] = useState(0);
@@ -32,6 +51,8 @@ export function StageClient({ qr }: { qr: QrProps }) {
   const [lost, setLost] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
   const [photos, setPhotos] = useState(0);
+  const [seenState, setSeenState] = useState<EventState | null>(null);
+  const [moments, setMoments] = useState<Moments>({ open: null, reveal: null, close: null });
   const keyRef = useRef<string | null>(null);
   // Newest snapshot per award that has not been drawn yet
   const pending = useRef<Record<number, TallySnapshot>>({});
@@ -64,15 +85,16 @@ export function StageClient({ qr }: { qr: QrProps }) {
     const k = keyRef.current;
     if (!k) return;
     try {
-      const r = await fetchWithTimeout(withBase(`/api/stage/snapshot?k=${encodeURIComponent(k)}`), {}, 8_000);
-      if (r.status === 401) {
+      const res = await fetchWithTimeout(withBase(`/api/stage/snapshot?k=${encodeURIComponent(k)}`), {}, 8_000);
+      if (res.status === 401) {
         setPhase("bad_key");
         return;
       }
-      if (!r.ok) throw new Error(String(r.status));
-      const j = (await r.json()) as { state: EventState; tally: TallySnapshot | null };
+      if (!res.ok) throw new Error(String(res.status));
+      const j = (await res.json()) as { state: EventState; tally: TallySnapshot | null; hall?: TallySnapshot[] };
       applyState(j.state);
       if (j.tally) applyTally(j.tally);
+      j.hall?.forEach(applyTally);
       setPhase("ready");
       setSyncFailed(false);
     } catch {
@@ -102,7 +124,7 @@ export function StageClient({ qr }: { qr: QrProps }) {
     keyRef.current = k;
     void fetch(withBase("/api/health"), { cache: "no-store" }).catch(() => undefined); // wake Neon
     queueMicrotask(() => void resync());
-    const feed = createLiveFeed({ role: "stage", stageKey: k });
+    const feed = createStaffFeed({ role: "stage", stageKey: k });
     feed.onEvent(applyState);
     feed.onTally(applyTally);
     feed.onStatus(setLive);
@@ -126,6 +148,19 @@ export function StageClient({ qr }: { qr: QrProps }) {
     return () => clearTimeout(t);
   }, [live, resync]);
 
+  // Adjust-state-while-rendering: compare with the last state this screen drew
+  if (state !== seenState) {
+    setSeenState(state);
+    if (state && seenState) {
+      const next = detectMoments(seenState, state, moments);
+      if (next !== moments) setMoments(next);
+    }
+  }
+
+  useEffect(() => {
+    if (moments.close) cue("sfx_close");
+  }, [moments.close]);
+
   if (phase === "no_key" || phase === "bad_key") {
     return (
       <Canvas>
@@ -141,7 +176,7 @@ export function StageClient({ qr }: { qr: QrProps }) {
     return (
       <Canvas>
         <div className={s.message} role="status">
-          <p>{qr.eventTitle}</p>
+          <p>{qrMain.eventTitle}</p>
           <div className={s.progress}>
             <div className={s.progressFill} style={{ transform: `scaleX(${photos / nominees.length})` }} />
           </div>
@@ -152,23 +187,48 @@ export function StageClient({ qr }: { qr: QrProps }) {
   }
 
   const award = state.awards.find((a) => a.id === state.current_award_id) ?? null;
+  const qr = state.qr_fallback && qrFallback ? qrFallback : qrMain;
+  const tally = award && tallies[award.id]?.round === award.round ? tallies[award.id] : undefined;
+  const momentFor = (k: string | null) => !!award && !!k && k.startsWith(`${award.id}:${award.round}:`);
+  const revealed = award?.status === "revealed";
+  const playReveal = revealed && momentFor(moments.reveal);
 
   return (
     <Canvas>
-      {!award ? (
+      {state.show_hall ? (
+        <Hall awards={state.awards} tallies={tallies} />
+      ) : !award ? (
         <Lobby title={state.title} />
       ) : award.status === "pending" ? (
         <Pending award={award} qr={qr} />
       ) : (
-        <RaceView
-          // A new award or a reset (new round) starts a fresh race with the lanes fanning in
-          key={`${award.id}:${award.round}`}
-          award={award}
-          tally={tallies[award.id]?.round === award.round ? tallies[award.id] : undefined}
-          hide={state.hide_counts}
-          qr={qr}
-          clockOffset={clockOffset}
-        />
+        <>
+          {(!revealed || playReveal) && (
+            // Same wrapper element either way, so the race is not remounted when the reveal starts
+            <div className={revealed ? r.raceOut : undefined}>
+              <RaceView
+                // A new award or a reset (new round) starts a fresh race with the lanes fanning in
+                key={`${award.id}:${award.round}`}
+                award={award}
+                tally={tally}
+                hide={state.hide_counts}
+                qr={qr}
+                clockOffset={clockOffset}
+              />
+            </div>
+          )}
+          {award.status === "open" && award.auto_close_at && (
+            <CountdownCues key={award.auto_close_at} award={award} clockOffset={clockOffset} />
+          )}
+          {award.status === "open" && momentFor(moments.open) && (
+            <OpenIntro
+              key={moments.open}
+              title={award.title}
+              onDone={() => setMoments((m) => ({ ...m, open: null }))}
+            />
+          )}
+          {revealed && <Reveal key={`${award.id}:${award.round}`} award={award} tally={tally} play={playReveal} />}
+        </>
       )}
 
       {live !== "connected" && (

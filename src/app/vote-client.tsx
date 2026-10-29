@@ -76,7 +76,7 @@ export function VoteClient() {
       }
     })();
     queueMicrotask(() => void fetchState());
-    const feed = createLiveFeed({ role: "mobile" });
+    const feed = createLiveFeed();
     feed.onEvent(applyState);
     feed.onStatus(setLive);
     return () => feed.close();

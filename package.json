@@ -1,6 +1,6 @@
 {
   "name": "live-vote",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3154",
@@ -16,6 +16,7 @@
     "latency": "tsx scripts/measure-latency.ts",
     "e2e": "tsx scripts/e2e-browser.ts",
     "e2e:stage": "tsx scripts/e2e-stage.ts",
+    "e2e:admin": "tsx scripts/e2e-admin.ts",
     "bundle": "tsx scripts/measure-bundle.ts"
   },
   "dependencies": {

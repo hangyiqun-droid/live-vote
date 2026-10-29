@@ -1,0 +1,639 @@
+/* MC page (SPEC 4.3). Phone first — the MC walks around holding it — and fine on a laptop.
+   Outside the Tailwind scan (globals.css) so none of this reaches the phone vote page. */
+
+.page {
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 16px 14px 40px;
+  background: #0b1020;
+  color: #e5e7eb;
+  font-size: 16px;
+}
+
+:global(body):has(.page) {
+  background: #0b1020;
+}
+
+.page svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.center {
+  padding-top: 30vh;
+  text-align: center;
+  font-size: 20px;
+}
+
+.h1 {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+/* ---------- buttons ---------- */
+
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 8px 16px;
+  border-radius: 14px;
+  border: 1px solid rgb(255 255 255 / 0.18);
+  background: rgb(255 255 255 / 0.08);
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible,
+.seg:focus-visible,
+.switch:focus-visible,
+.iconBtn:focus-visible,
+.ghost:focus-visible,
+.input:focus-visible {
+  outline: 3px solid #fbbf24;
+  outline-offset: 2px;
+}
+
+.btnPrimary {
+  background: #2563eb;
+  border-color: #3b82f6;
+  color: #fff;
+}
+
+.btnDanger {
+  background: #b91c1c;
+  border-color: #ef4444;
+  color: #fff;
+}
+
+.btnGold {
+  background: #b45309;
+  border-color: #f59e0b;
+  color: #fff;
+}
+
+.btnOn {
+  background: #047857;
+  border-color: #10b981;
+  color: #fff;
+}
+
+.btnQuiet {
+  background: transparent;
+  color: #fca5a5;
+  border-color: rgb(252 165 165 / 0.4);
+}
+
+.wide {
+  width: 100%;
+}
+
+.ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: #cbd5e1;
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.06);
+  color: #cbd5e1;
+  cursor: pointer;
+}
+
+/* Hold-to-confirm: a fill sweeps across while held */
+.hold {
+  overflow: hidden;
+  min-width: 150px;
+}
+
+.holdFill {
+  position: absolute;
+  inset: 0;
+  background: rgb(255 255 255 / 0.28);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+}
+
+.holding .holdFill {
+  transform: scaleX(1);
+  transition: transform 1500ms linear;
+}
+
+.holdLabel {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1.2;
+}
+
+.holdLabel > :first-child {
+  display: inline-flex;
+}
+
+.holdLabel small {
+  font-size: 12px;
+  font-weight: 400;
+  opacity: 0.85;
+}
+
+/* switch = button role="switch" */
+.switch {
+  composes: btn;
+  padding-right: 64px;
+}
+
+.knob {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  width: 40px;
+  height: 24px;
+  margin-top: -12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.2);
+}
+
+.knob::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 160ms ease;
+}
+
+.switchOn {
+  background: rgb(16 185 129 / 0.2);
+  border-color: #10b981;
+}
+
+.switchOn .knob {
+  background: #10b981;
+}
+
+.switchOn .knob::after {
+  transform: translateX(16px);
+}
+
+/* ---------- header ---------- */
+
+.top {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.topRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.statusRow,
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  background: rgb(255 255 255 / 0.08);
+}
+
+.pillOk {
+  background: rgb(16 185 129 / 0.18);
+  color: #6ee7b7;
+}
+
+.pillBad {
+  background: rgb(239 68 68 / 0.2);
+  color: #fca5a5;
+}
+
+.pillWarn {
+  background: rgb(249 115 22 / 0.2);
+  color: #fdba74;
+}
+
+.stageLink {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.05);
+  font-size: 13px;
+}
+
+.stageLink code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #94a3b8;
+  user-select: all;
+}
+
+.note {
+  width: 100%;
+  font-size: 13px;
+  color: #94a3b8;
+}
+
+.alert,
+.undo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+}
+
+.alert {
+  background: rgb(185 28 28 / 0.25);
+  border: 1px solid #ef4444;
+  color: #fecaca;
+}
+
+.undo {
+  background: rgb(16 185 129 / 0.12);
+  border: 1px solid rgb(16 185 129 / 0.5);
+  color: #a7f3d0;
+}
+
+.alert p,
+.undo p {
+  flex: 1;
+  min-width: 160px;
+  font-weight: 700;
+}
+
+/* ---------- award cards ---------- */
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  list-style: none;
+  padding: 0;
+}
+
+.card {
+  padding: 14px;
+  border-radius: 18px;
+  background: rgb(255 255 255 / 0.05);
+  border: 1px solid rgb(255 255 255 / 0.1);
+}
+
+.cardCurrent {
+  border-color: #fbbf24;
+  box-shadow: 0 0 0 1px #fbbf24;
+}
+
+.cardHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cardTitle {
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.cardSub {
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.badge svg {
+  width: 16px;
+  height: 16px;
+}
+
+.badgePending {
+  background: rgb(148 163 184 / 0.2);
+  color: #cbd5e1;
+}
+
+.badgeOpen {
+  background: rgb(16 185 129 / 0.22);
+  color: #6ee7b7;
+}
+
+.badgeClosed {
+  background: rgb(249 115 22 / 0.22);
+  color: #fdba74;
+}
+
+.badgeRevealed {
+  background: rgb(250 204 21 / 0.2);
+  color: #fde68a;
+}
+
+.badgeScreen {
+  background: #fbbf24;
+  color: #1f1300;
+}
+
+.total {
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.total strong {
+  font-size: 18px;
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+
+.time {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #fde68a;
+}
+
+.timeLow {
+  color: #fb923c;
+}
+
+.top5 {
+  margin-top: 10px;
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.top5 li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+}
+
+.top5 img {
+  width: 30px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  object-position: center 30%;
+}
+
+.rank {
+  width: 22px;
+  text-align: right;
+  font-weight: 800;
+  color: #94a3b8;
+}
+
+.nick {
+  font-weight: 700;
+}
+
+.chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.gAMBER {
+  background: #b45309;
+}
+
+.gAZURE {
+  background: #0369a1;
+}
+
+.gJADE {
+  background: #047857;
+}
+
+.gRUBY {
+  background: #b91c1c;
+}
+
+.votes {
+  margin-left: auto;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.empty {
+  margin-top: 10px;
+  font-size: 14px;
+  color: #94a3b8;
+}
+
+.verified,
+.unverified,
+.warn {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+.verified {
+  color: #6ee7b7;
+}
+
+.unverified,
+.warn {
+  color: #fdba74;
+}
+
+.warn {
+  width: 100%;
+  margin-top: 0;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.timerPick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.timerLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.seg {
+  min-width: 64px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid rgb(255 255 255 / 0.2);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.segOn {
+  background: #fbbf24;
+  border-color: #fbbf24;
+  color: #1f1300;
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 0.25);
+}
+
+/* ---------- forms ---------- */
+
+.login {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+  margin: 18vh auto 0;
+}
+
+.loginIcon {
+  width: 40px !important;
+  height: 40px !important;
+  color: #fbbf24;
+}
+
+.label {
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.input {
+  min-height: 48px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  background: rgb(255 255 255 / 0.06);
+  color: #fff;
+  font: inherit;
+  font-size: 18px;
+}
+
+.input[aria-invalid="true"] {
+  border-color: #f87171;
+}
+
+.fieldError {
+  font-size: 14px;
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+.spin {
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.footer {
+  margin-top: 28px;
+  text-align: center;
+  font-size: 12px;
+  color: #64748b;
+}

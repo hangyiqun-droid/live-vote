@@ -33,6 +33,8 @@ export const events = pgTable("events", {
   title: text("title").notNull(),
   currentAwardId: smallint("current_award_id").references(() => awards.id), // null = lobby
   hideCounts: boolean("hide_counts").notNull().default(false),
+  showHall: boolean("show_hall").notNull().default(false), // MC put the hall of winners on screen (M3)
+  qrFallback: boolean("qr_fallback").notNull().default(false), // stage QR points at the backup URL (SPEC 8.2)
   // Bumps on every status/state change — orders event:event messages
   version: bigint("version", { mode: "number" }).notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),

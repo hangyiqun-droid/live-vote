@@ -284,7 +284,7 @@
 }
 
 .total {
-  font-size: 120px;
+  font-size: 104px;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -309,6 +309,32 @@
 
 .countdownLow {
   color: #fb923c;
+}
+
+.countdownBig {
+  margin-top: 8px;
+  font-size: 104px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: #fb923c;
+  text-shadow: 0 0 50px rgb(251 146 60 / 0.6);
+  animation: tickBeat 1000ms ease-out both;
+}
+
+@keyframes tickBeat {
+  0% {
+    opacity: 0.2;
+    transform: scale(1.6);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0.85;
+    transform: scale(0.94);
+  }
 }
 
 /* ---------- race ---------- */

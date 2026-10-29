@@ -1,0 +1,31 @@
+// Sound hook points for M4 (SPEC 6.1). Scenes call cue("sfx_…") at the moment a sound belongs;
+// M4 listens with onCue() and plays the sprite. Until then nothing listens and cues cost nothing.
+export type CueKey =
+  | "bgm_lobby"
+  | "bgm_voting"
+  | "sfx_tick"
+  | "sfx_overtake"
+  | "sfx_leader"
+  | "sfx_chase"
+  | "sfx_open"
+  | "sfx_count"
+  | "sfx_close"
+  | "sfx_drumroll"
+  | "sfx_place"
+  | "sfx_reveal"
+  | "sfx_applause";
+
+export type Cue = { key: CueKey; detail?: Record<string, unknown> };
+
+const EVENT = "event:cue";
+
+export function cue(key: CueKey, detail?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent<Cue>(EVENT, { detail: { key, detail } }));
+}
+
+export function onCue(cb: (c: Cue) => void): () => void {
+  const h = (e: Event) => cb((e as CustomEvent<Cue>).detail);
+  window.addEventListener(EVENT, h);
+  return () => window.removeEventListener(EVENT, h);
+}

@@ -3,6 +3,7 @@
 /* The stage styles itself with stage.module.css — keep its markup out of the shared CSS the
    phone vote page downloads (SPEC 4.2 size budget) */
 @source not "./stage";
+@source not "./admin";
 
 @theme inline {
   --font-sans: var(--font-noto-thai), system-ui, sans-serif;

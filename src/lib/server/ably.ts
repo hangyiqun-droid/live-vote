@@ -14,11 +14,12 @@ function rest(): Ably.Rest {
   return globalForAbly.eventAbly;
 }
 
-export type Role = "mobile" | "stage";
+export type Role = "mobile" | "stage" | "admin";
 
-// Phones can only hear award statuses — they have no way to read the tally channel
+// Phones can only hear award statuses — they have no way to read the tally channel.
+// Stage enters presence on the tally channel; the MC page watches it ("is the screen connected").
 export function capabilityFor(role: Role): Record<string, Ably.capabilityOp[]> {
-  if (role === "stage") {
+  if (role === "stage" || role === "admin") {
     return {
       [CHANNEL_EVENT]: ["subscribe"],
       [CHANNEL_TALLY]: ["subscribe", "presence"],

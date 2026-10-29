@@ -11,7 +11,11 @@ export async function GET(req: NextRequest) {
   try {
     const state = await expireAndRead();
     const tally = state.current_award_id ? await readSnapshot(state.current_award_id) : null;
-    return json({ state, tally });
+    // The hall of winners needs every revealed award, not only the current one
+    const hall = state.show_hall
+      ? await Promise.all(state.awards.filter((a) => a.status === "revealed").map((a) => readSnapshot(a.id)))
+      : [];
+    return json({ state, tally, hall: hall.filter(Boolean) });
   } catch (e) {
     return serverError("stage/snapshot", e);
   }

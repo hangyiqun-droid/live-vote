@@ -18,6 +18,8 @@ export type EventState = {
   title: string;
   current_award_id: number | null;
   hide_counts: boolean;
+  show_hall: boolean; // MC put the hall of winners on screen
+  qr_fallback: boolean; // stage QR shows the backup URL (SPEC 8.2)
   server_now: string;
   awards: AwardState[];
 };
@@ -32,6 +34,10 @@ export type TallySnapshot = {
   total: number;
   counts: [number, number][];
 };
+
+// MC page: every award's tally plus the ballot/tally cross-check (verify_tallies)
+export type AdminTally = TallySnapshot & { verified: boolean };
+export type AdminOverview = { state: EventState; tallies: AdminTally[] };
 
 export type VoteResult =
   | { result: "counted"; snapshot?: TallySnapshot; replay?: boolean }
