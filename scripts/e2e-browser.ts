@@ -10,7 +10,7 @@ config({ path: ".env.local", quiet: true });
 
 const base = (process.argv[2] ?? "http://localhost:3155").replace(/\/$/, "") + "";
 const K = process.env.STAGE_KEY ?? "";
-const OUT = "docs/qa/evidence/m1";
+const OUT = process.env.E2E_OUT ?? "docs/qa/evidence/m1";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const problems: string[] = [];
@@ -120,13 +120,15 @@ async function main() {
   watch(stage, "stage");
   await stage.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
   await stage.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
-  await stage.getByText(/เสียงรวม/).waitFor();
-  const shown = async () => Number((await stage.getByText(/เสียงรวม/).innerText()).replace(/[^0-9]/g, ""));
+  await stage.locator("[data-stage-total]").waitFor();
+  // The total under the QR (the digits roll, so read the value the stage is showing/rolling to)
+  const shown = async () => Number(await stage.locator("[data-stage-total]").getAttribute("data-stage-total"));
+  const totalIs = (n: number) => document.querySelector("[data-stage-total]")?.getAttribute("data-stage-total") === String(n);
   // Live update while connected
   const s0 = await shown();
   const tVote = Date.now();
   await castVotes(1);
-  await stage.waitForFunction((n) => document.body.innerText.includes(`เสียงรวม ${(n as number).toLocaleString("th-TH")}`), s0 + 1);
+  await stage.waitForFunction(totalIs, s0 + 1);
   log.push(`stage live update while connected: ${Date.now() - tVote} ms (HTTP vote → number on stage DOM)`);
   await stage.screenshot({ path: `${OUT}/stage-live.jpg`, quality: 70 });
 
@@ -140,11 +142,7 @@ async function main() {
   await sctx.setOffline(false);
   const tBack = Date.now();
   const want = (await dbTotal()).total;
-  await stage.waitForFunction(
-    (n) => document.body.innerText.includes(`เสียงรวม ${(n as number).toLocaleString("th-TH")}`),
-    want,
-    { timeout: 20_000 },
-  );
+  await stage.waitForFunction(totalIs, want, { timeout: 20_000 });
   log.push(`stage offline 30 s: banner "${banner}" · showed ${frozen} while DB moved on · back online → ${want} (= DB) in ${Date.now() - tBack} ms`);
   expectNetErrors = false;
   await sctx.close();

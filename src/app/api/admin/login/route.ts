@@ -1,20 +1,23 @@
-import type { NextRequest } from "next/server";
+import type { NextRequest, NextResponse } from "next/server";
 import { makeSession, passcodeMatches, setAdminCookie } from "@/lib/server/admin-session";
 import { json } from "@/lib/server/http";
+import { canTry, LOGIN_TAG_COOKIE, parseTag, recordFail, recordSuccess } from "@/lib/server/login-guard";
+import { ensureLoginTag } from "@/lib/server/login-tag";
 import { clientIp } from "@/lib/server/rate-limit";
 
-// SPEC 4.3: 5 wrong passcodes within a minute → that IP waits a minute. Memory only.
-const MAX_FAILS = 5;
-const WINDOW_MS = 60_000;
-const fails = new Map<string, { n: number; first: number; lockedUntil: number }>();
-
+// SPEC 4.3 + M5: wrong guesses lock the guessing *browser* (growing wait), never the venue IP —
+// see src/lib/server/login-guard.ts.
 export async function POST(req: NextRequest) {
   const ip = clientIp(req.headers);
-  const now = Date.now();
-  const f = fails.get(ip);
-  if (f && f.lockedUntil > now) {
-    return json({ error: "locked", retry_after: Math.ceil((f.lockedUntil - now) / 1000) }, 429);
-  }
+  const existing = parseTag(req.cookies.get(LOGIN_TAG_COOKIE)?.value);
+  const { tag, set } = ensureLoginTag(existing);
+  const reply = (res: NextResponse) => {
+    set(res);
+    return res;
+  };
+
+  const gate = canTry(ip, tag);
+  if (!gate.ok) return reply(json({ error: "locked", retry_after: gate.retryAfter }, 429));
 
   let passcode: unknown;
   try {
@@ -24,16 +27,16 @@ export async function POST(req: NextRequest) {
   }
 
   if (!passcodeMatches(passcode)) {
-    const cur = f && now - f.first < WINDOW_MS ? f : { n: 0, first: now, lockedUntil: 0 };
-    cur.n += 1;
-    if (cur.n >= MAX_FAILS) cur.lockedUntil = now + WINDOW_MS;
-    if (fails.size > 1_000) fails.clear();
-    fails.set(ip, cur);
-    return json({ error: cur.lockedUntil > now ? "locked" : "wrong", retry_after: 60 }, cur.lockedUntil > now ? 429 : 401);
+    const wait = recordFail(ip, tag);
+    return reply(
+      wait
+        ? json({ error: "locked", retry_after: Math.ceil(wait / 1000) }, 429)
+        : json({ error: "wrong", retry_after: 0 }, 401),
+    );
   }
 
-  fails.delete(ip);
+  recordSuccess(tag);
   const res = json({ ok: true });
   setAdminCookie(res, makeSession());
-  return res;
+  return reply(res);
 }

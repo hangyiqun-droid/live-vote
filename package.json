@@ -1,6 +1,6 @@
 {
   "name": "live-vote",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3154",
@@ -14,7 +14,11 @@
     "photos": "tsx scripts/make-photos.ts",
     "award": "tsx scripts/award.ts",
     "latency": "tsx scripts/measure-latency.ts",
+    "load": "tsx scripts/load-test.ts",
+    "prod:db": "tsx scripts/prod-db.ts",
+    "smoke": "tsx scripts/smoke.ts",
     "e2e": "tsx scripts/e2e-browser.ts",
+    "e2e:browser": "tsx scripts/e2e-browser.ts",
     "e2e:stage": "tsx scripts/e2e-stage.ts",
     "e2e:admin": "tsx scripts/e2e-admin.ts",
     "bundle": "tsx scripts/measure-bundle.ts",

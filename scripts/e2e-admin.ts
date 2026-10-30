@@ -178,6 +178,25 @@ async function main() {
   await seen(admin, "รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง", "wrong passcode is refused");
   check((await admin.locator("[data-award]").count()) === 0, "wrong passcode shows no controls");
   await admin.screenshot({ path: `${OUT}/admin-login-wrong.jpg`, quality: 82 });
+
+  // M5: a guest on the same venue IP guesses until locked — the MC's browser must still get in
+  const guestCtx = await mk({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true });
+  const guest = await guestCtx.newPage();
+  await guest.goto(`${base}/admin`);
+  for (let i = 0; i < 4; i++) {
+    await guest.getByLabel("รหัสพิธีกร").fill(`guess-${i}`);
+    await guest.getByRole("button", { name: "เข้าสู่ระบบ" }).click();
+    await guest.getByRole("alert").waitFor();
+    await sleep(300);
+  }
+  await seen(guest, "ใส่รหัสผิดหลายครั้ง เครื่องนี้ต้องรอ", "guest's own browser is paused after repeated guesses (Thai message)");
+  await guest.getByLabel("รหัสพิธีกร").fill(PASS);
+  await guest.getByRole("button", { name: "เข้าสู่ระบบ" }).click();
+  await sleep(800);
+  check((await guest.locator("[data-award]").count()) === 0, "a paused guest browser stays out even with the right passcode");
+  await guest.screenshot({ path: `${OUT}/admin-login-guest-paused.jpg`, quality: 82 });
+  await guestCtx.close();
+
   await admin.getByLabel("รหัสพิธีกร").fill(PASS);
   await admin.getByRole("button", { name: "เข้าสู่ระบบ" }).click();
   await admin.locator("[data-award]").first().waitFor();

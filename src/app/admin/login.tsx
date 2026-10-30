@@ -31,7 +31,7 @@ export function Login({ version, onDone }: { version: string; onDone: () => void
         onDone();
         return;
       }
-      if (r.status === 429) setError("ใส่รหัสผิดหลายครั้ง พักสักครู่แล้วลองใหม่ใน 1 นาที");
+      if (r.status === 429) setError(lockedMessage((await r.json().catch(() => null))?.retry_after));
       else if (r.status === 401) setError("รหัสไม่ถูกต้อง ลองใหม่อีกครั้ง");
       else throw new Error(String(r.status));
     } catch {
@@ -81,4 +81,10 @@ export function Login({ version, onDone }: { version: string; onDone: () => void
       <footer className={a.footer}>{version}</footer>
     </main>
   );
+}
+
+function lockedMessage(retryAfter: unknown): string {
+  const s = typeof retryAfter === "number" && retryAfter > 0 ? Math.ceil(retryAfter) : 60;
+  const wait = s < 60 ? `${s.toLocaleString("th-TH")} วินาที` : `${Math.ceil(s / 60).toLocaleString("th-TH")} นาที`;
+  return `ใส่รหัสผิดหลายครั้ง เครื่องนี้ต้องรอ ${wait} แล้วค่อยลองใหม่`;
 }

@@ -48,13 +48,20 @@ export function createStaffFeed(opts: Options): StaffFeed {
       statusCbs.forEach((cb) => cb(s));
     });
 
-    client.channels.get(CHANNEL_EVENT).subscribe("state", (m: InboundMessage) => {
-      eventCbs.forEach((cb) => cb(m.data as EventState));
-    });
+    // subscribe() also attaches; offline the attach times out and rejects. Ably re-attaches by
+    // itself once the connection is back, so the rejection is expected — never an uncaught error.
+    client.channels
+      .get(CHANNEL_EVENT)
+      .subscribe("state", (m: InboundMessage) => {
+        eventCbs.forEach((cb) => cb(m.data as EventState));
+      })
+      .catch(() => undefined);
     const tally = client.channels.get(CHANNEL_TALLY);
-    void tally.subscribe("tally", (m: InboundMessage) => {
-      tallyCbs.forEach((cb) => cb(m.data as TallySnapshot));
-    });
+    void tally
+      .subscribe("tally", (m: InboundMessage) => {
+        tallyCbs.forEach((cb) => cb(m.data as TallySnapshot));
+      })
+      .catch(() => undefined);
 
     if (opts.role === "stage") {
       // Ably re-enters presence by itself after a reconnect
@@ -68,7 +75,7 @@ export function createStaffFeed(opts: Options): StaffFeed {
             screenCbs.forEach((cb) => cb(n));
           })
           .catch(() => undefined);
-      void tally.presence.subscribe(() => void count());
+      void tally.presence.subscribe(() => void count()).catch(() => undefined);
       void count();
     }
   });

@@ -18,7 +18,7 @@ config({ path: ".env.local", quiet: true });
 
 const base = (process.argv[2] ?? "http://localhost:3156").replace(/\/$/, "") + "";
 const K = process.env.STAGE_KEY ?? "";
-const OUT = "docs/qa/evidence/m2";
+const OUT = process.env.E2E_OUT ?? "docs/qa/evidence/m2";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const AWARD = 1;
 

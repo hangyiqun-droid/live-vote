@@ -1,0 +1,383 @@
+// M5 load test (SPEC 7 · 1.3 · 8.2). Talks to the app only over HTTP + Ably, exactly like phones,
+// the stage and the MC do — so the same script runs against local, a preview or prod.
+//
+//   pnpm load [baseUrl] [--devices 150] [--listeners 100] [--burst 100] [--tally-listeners 1]
+//             [--awards 1,2] [--out docs/qa/evidence/m5] [--reset] [--keep] [--yes]
+//             [--server-log /tmp/server.log]   (local only: count "[ably] publish … failed" lines)
+//
+// 1. opens <listeners> phone connections (role mobile, event:event only) + <tally-listeners> stage
+//    connections (event:tally) through the app's own /api/realtime/token
+// 2. award A: <devices> phones vote at the same instant; 20 of them double-send the same request,
+//    then every phone resends (same request → "counted", no double count) and tries a second
+//    ballot (new request → "already_voted")
+// 3. award B: <burst> votes inside 1 s (near Ably's 500 msg/s account ceiling) → how long until the
+//    stage has the true total (over Ably, or at worst the 15 s snapshot resync)
+// 4. checks: no vote lost or doubled per nominee · stage total = DB (verify_tallies via the MC
+//    overview) · max Ably connections · p50/p95 · 0 × 429 from one shared IP
+//
+// Everything comes from one machine = one IP, which is the venue Wi-Fi case on purpose.
+// Needs in .env.local: STAGE_KEY, ADMIN_PASSCODE (same values as the target). Optional:
+// VERCEL_AUTOMATION_BYPASS_SECRET for a protected preview. Ably quota is per *account* —
+// never run this during the real event.
+import { randomUUID } from "node:crypto";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { config } from "dotenv";
+import * as Ably from "ably";
+import type { AdminOverview, EventState, TallySnapshot } from "../src/lib/types";
+import { CHANNEL_EVENT, CHANNEL_TALLY } from "../src/lib/types";
+
+config({ path: ".env.local", quiet: true });
+
+const argv = process.argv.slice(2);
+const flag = (name: string) => argv.includes(`--${name}`);
+const opt = (name: string, def: string) => {
+  const i = argv.indexOf(`--${name}`);
+  return i >= 0 && argv[i + 1] ? argv[i + 1] : def;
+};
+const origin = (argv.find((a) => !a.startsWith("--") && /^https?:/.test(a)) ?? "http://localhost:3159").replace(/\/$/, "");
+const base = `${origin}`;
+const DEVICES = Number(opt("devices", "150"));
+const LISTENERS = Number(opt("listeners", "100"));
+const TALLY_LISTENERS = Number(opt("tally-listeners", "1"));
+const BURST = Number(opt("burst", "100"));
+const [AWARD_A, AWARD_B] = opt("awards", "1,2").split(",").map(Number);
+const OUT = opt("out", "docs/qa/evidence/m5");
+const DOUBLE_SEND = Math.min(20, DEVICES);
+const K = process.env.STAGE_KEY ?? "";
+const PASS = process.env.ADMIN_PASSCODE ?? "";
+const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const SERVER_LOG = opt("server-log", "");
+const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin);
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const log: string[] = [];
+const problems: string[] = [];
+const say = (s: string) => {
+  console.log(s);
+  log.push(s);
+};
+const check = (ok: boolean, what: string) => {
+  say(`${ok ? "PASS" : "FAIL"} ${what}`);
+  if (!ok) problems.push(what);
+};
+const pct = (xs: number[], p: number) => {
+  if (!xs.length) return NaN;
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.min(s.length - 1, Math.max(0, Math.ceil((p / 100) * s.length) - 1))];
+};
+const stats = (xs: number[]) =>
+  `p50 ${pct(xs, 50).toFixed(0)} ms · p95 ${pct(xs, 95).toFixed(0)} ms · max ${Math.max(...xs).toFixed(0)} ms (n=${xs.length})`;
+
+// ---- HTTP -------------------------------------------------------------------------------------
+let adminCookie = "";
+const statusCounts = new Map<number, number>();
+
+async function http(path: string, init: RequestInit = {}, cookie = ""): Promise<Response> {
+  const headers = new Headers(init.headers);
+  if (BYPASS) headers.set("x-vercel-protection-bypass", BYPASS);
+  if (cookie) headers.set("cookie", cookie);
+  const r = await fetch(`${base}${path}`, { ...init, headers });
+  statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
+  return r;
+}
+
+async function login() {
+  const r = await http("/api/admin/login", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ passcode: PASS }),
+  });
+  if (!r.ok) throw new Error(`MC login failed (${r.status}) — ADMIN_PASSCODE in .env.local must match the target`);
+  adminCookie = (r.headers.getSetCookie?.() ?? [])
+    .map((c) => c.split(";")[0])
+    .filter((c) => c.startsWith("event_admin="))
+    .join("; ");
+}
+
+async function overview(): Promise<AdminOverview> {
+  const r = await http("/api/admin/overview", {}, adminCookie);
+  if (!r.ok) throw new Error(`overview ${r.status}`);
+  return (await r.json()) as AdminOverview;
+}
+
+async function act(body: Record<string, unknown>, okErrors: string[] = []): Promise<AdminOverview> {
+  const r = await http(
+    "/api/admin/action",
+    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+    adminCookie,
+  );
+  const j = (await r.json()) as { ok: boolean; error?: string; overview: AdminOverview };
+  if (!j.ok && !okErrors.includes(j.error ?? "")) throw new Error(`admin ${body.action}: ${j.error ?? r.status}`);
+  return j.overview;
+}
+
+// Bring an award back to "pending, 0 votes" from whatever state it is in
+async function resetAward(id: number) {
+  let o = await overview();
+  const a = () => o.state.awards.find((x) => x.id === id)!;
+  if (a().status === "open") o = await act({ action: "close", award_id: id });
+  if (a().status === "revealed") o = await act({ action: "unreveal", award_id: id });
+  if (a().status === "closed" || totalOf(o, id) > 0) o = await act({ action: "reset", award_id: id, confirm: a().title });
+}
+
+const totalOf = (o: AdminOverview, id: number) => o.tallies.find((t) => t.award_id === id)?.total ?? 0;
+
+type Vote = { device: string; request: string; nominee: number };
+type VoteOut = { result: string; ms: number; status: number };
+
+async function sendVote(award: number, v: Vote): Promise<VoteOut> {
+  const t0 = performance.now();
+  try {
+    const r = await http("/api/vote", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ award_id: award, nominee_id: v.nominee, request_id: v.request, device_id: v.device }),
+    });
+    const j = (await r.json().catch(() => ({}))) as { result?: string };
+    return { result: j.result ?? `http_${r.status}`, ms: performance.now() - t0, status: r.status };
+  } catch {
+    return { result: "network_error", ms: performance.now() - t0, status: 0 };
+  }
+}
+
+// ---- Ably listeners ---------------------------------------------------------------------------
+type Listener = { client: Ably.Realtime; role: "mobile" | "stage"; connected: boolean };
+const listeners: Listener[] = [];
+let connectedNow = 0;
+let connectedMax = 0;
+let tallyMessages = 0;
+let latestTally: TallySnapshot | null = null;
+const tallyArrivals: { at: number; snap: TallySnapshot }[] = [];
+const eventArrivals = new Map<number, number>(); // version → listeners that heard it
+
+function openListener(role: "mobile" | "stage"): Listener {
+  const q = role === "stage" ? `?role=stage&k=${encodeURIComponent(K)}` : "";
+  const client = new Ably.Realtime({
+    authCallback: async (_params, cb) => {
+      try {
+        const r = await http(`/api/realtime/token${q}`);
+        if (!r.ok) throw new Error(`token ${r.status}`);
+        cb(null, (await r.json()) as Ably.TokenRequest);
+      } catch (e) {
+        cb(e instanceof Error ? e.message : "token failed", null);
+      }
+    },
+    echoMessages: false,
+    logLevel: 0,
+  } as Ably.ClientOptions);
+  const l: Listener = { client, role, connected: false };
+  client.connection.on((change) => {
+    const was = l.connected;
+    l.connected = change.current === "connected";
+    if (l.connected !== was) {
+      connectedNow += l.connected ? 1 : -1;
+      connectedMax = Math.max(connectedMax, connectedNow);
+    }
+  });
+  void client.channels.get(CHANNEL_EVENT).subscribe("state", (m) => {
+    const s = m.data as EventState;
+    eventArrivals.set(s.version, (eventArrivals.get(s.version) ?? 0) + 1);
+  });
+  if (role === "stage") {
+    void client.channels.get(CHANNEL_TALLY).subscribe("tally", (m) => {
+      const s = m.data as TallySnapshot;
+      tallyMessages += 1;
+      tallyArrivals.push({ at: performance.now(), snap: s });
+      // The stage keeps only the newest seq (SPEC 1.1 #4)
+      if (!latestTally || s.award_id !== latestTally.award_id || s.seq > latestTally.seq) latestTally = s;
+    });
+  }
+  listeners.push(l);
+  return l;
+}
+
+async function waitFor(cond: () => boolean, ms: number): Promise<number | null> {
+  const t0 = performance.now();
+  while (performance.now() - t0 < ms) {
+    if (cond()) return performance.now() - t0;
+    await sleep(25);
+  }
+  return cond() ? performance.now() - t0 : null;
+}
+
+async function stageSnapshot(): Promise<TallySnapshot | null> {
+  const r = await http(`/api/stage/snapshot?k=${encodeURIComponent(K)}`);
+  return ((await r.json()) as { tally: TallySnapshot | null }).tally;
+}
+
+const countsOf = (s: TallySnapshot | null) => new Map((s?.counts ?? []).map(([n, v]) => [n, v]));
+
+function compareCounts(label: string, expected: Map<number, number>, got: Map<number, number>) {
+  const diffs: string[] = [];
+  for (let n = 1; n <= 29; n++) {
+    const e = expected.get(n) ?? 0;
+    const g = got.get(n) ?? 0;
+    if (e !== g) diffs.push(`#${n} expected ${e} got ${g}`);
+  }
+  check(diffs.length === 0, `${label}: every nominee's count = votes sent${diffs.length ? ` (${diffs.slice(0, 5).join(", ")})` : ""}`);
+}
+
+let logStart = 0;
+
+// ---- main ---------------------------------------------------------------------------------------
+async function main() {
+  if (!K || !PASS) throw new Error("STAGE_KEY and ADMIN_PASSCODE must be in .env.local");
+  if (!isLocal && !flag("yes")) {
+    throw new Error(`${origin} is not local — this resets awards ${AWARD_A},${AWARD_B} there. Add --yes if you mean it.`);
+  }
+  const started = new Date();
+  say(`# M5 load test · ${started.toISOString()}`);
+  say(`target ${base} · devices ${DEVICES} · phone listeners ${LISTENERS} · stage listeners ${TALLY_LISTENERS} · burst ${BURST}/1 s · awards ${AWARD_A},${AWARD_B}${BYPASS ? " · vercel bypass on" : ""}`);
+
+  logStart = SERVER_LOG ? (await readFile(SERVER_LOG, "utf8")).split("\n").length - 1 : 0;
+  const health = await (await http("/api/health")).json();
+  say(`health ${JSON.stringify(health)}`);
+  await login();
+
+  // Refuse to wipe real votes unless asked to
+  let o = await overview();
+  const before = [AWARD_A, AWARD_B].map((id) => ({ id, total: totalOf(o, id), status: o.state.awards.find((a) => a.id === id)?.status }));
+  if (o.state.awards.some((a) => a.status === "open" && ![AWARD_A, AWARD_B].includes(a.id))) {
+    throw new Error("another award is open — close it first (only one award may be open)");
+  }
+  if (before.some((b) => b.total > 0 || b.status !== "pending") && !flag("reset")) {
+    throw new Error(`awards not clean (${JSON.stringify(before)}) — add --reset to wipe them first`);
+  }
+  for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
+
+  // 1. listeners
+  const tConn = performance.now();
+  for (let i = 0; i < TALLY_LISTENERS; i++) openListener("stage");
+  for (let i = 0; i < LISTENERS; i++) {
+    openListener("mobile");
+    if (i % 20 === 19) await sleep(100); // phones arrive over a few seconds, not in one tick
+  }
+  const connWait = await waitFor(() => connectedNow >= LISTENERS + TALLY_LISTENERS, 30_000);
+  check(connWait !== null, `${LISTENERS + TALLY_LISTENERS} Ably connections up (${((performance.now() - tConn) / 1000).toFixed(1)} s)`);
+  await sleep(1_000); // let the channel attaches settle
+
+  // 2. award A — all phones at once
+  say(`\n## A. ${DEVICES} phones vote at the same instant (award ${AWARD_A})`);
+  o = await act({ action: "open", award_id: AWARD_A, seconds: 0 });
+  const openVersion = o.state.version;
+  const heard = await waitFor(() => (eventArrivals.get(openVersion) ?? 0) >= LISTENERS + TALLY_LISTENERS, 10_000);
+  check(heard !== null, `"award open" reached all ${LISTENERS + TALLY_LISTENERS} listeners (${eventArrivals.get(openVersion) ?? 0} heard it${heard !== null ? `, ${heard.toFixed(0)} ms` : ""})`);
+
+  const votes: Vote[] = Array.from({ length: DEVICES }, () => ({
+    device: randomUUID(),
+    request: randomUUID(),
+    nominee: 1 + Math.floor(Math.random() * 29),
+  }));
+  const expectedA = new Map<number, number>();
+  for (const v of votes) expectedA.set(v.nominee, (expectedA.get(v.nominee) ?? 0) + 1);
+
+  const tA = performance.now();
+  const first = await Promise.all([
+    ...votes.map((v) => sendVote(AWARD_A, v)),
+    // 20 phones whose first send "times out" and is resent while the first is still in flight
+    ...votes.slice(0, DOUBLE_SEND).map((v) => sendVote(AWARD_A, v)),
+  ]);
+  const wallA = performance.now() - tA;
+  const byResult = (xs: VoteOut[]) => Object.fromEntries([...new Set(xs.map((x) => x.result))].map((r) => [r, xs.filter((x) => x.result === r).length]));
+  say(`results ${JSON.stringify(byResult(first))} · all answered in ${wallA.toFixed(0)} ms`);
+  say(`POST /api/vote (concurrent) ${stats(first.map((x) => x.ms))}`);
+  check(first.every((x) => x.result === "counted"), `every phone (and every in-flight double send) got "counted"`);
+
+  const stageA = await waitFor(() => latestTally?.award_id === AWARD_A && latestTally.total === DEVICES, 15_000);
+  check(stageA !== null, `stage (Ably) shows total ${DEVICES} after the rush${stageA !== null ? ` (+${stageA.toFixed(0)} ms after the last answer)` : ` — has ${latestTally?.total ?? "nothing"}`}`);
+
+  // Replays: same request again → counted (not double), new request from the same phone → already_voted
+  const replays = await Promise.all([
+    ...votes.map((v) => sendVote(AWARD_A, v)),
+    ...votes.map((v) => sendVote(AWARD_A, { ...v, request: randomUUID(), nominee: 1 + ((v.nominee + 5) % 29) })),
+  ]);
+  const same = replays.slice(0, DEVICES);
+  const second = replays.slice(DEVICES);
+  say(`replays ${JSON.stringify(byResult(same))} · second ballots ${JSON.stringify(byResult(second))}`);
+  say(`POST /api/vote (replay burst ×${replays.length}) ${stats(replays.map((x) => x.ms))}`);
+  check(same.every((x) => x.result === "counted"), `resending the same request answers "counted" (phone shows thank-you)`);
+  check(second.every((x) => x.result === "already_voted"), `a second ballot from the same phone → "already_voted"`);
+
+  o = await overview();
+  const dbA = o.tallies.find((t) => t.award_id === AWARD_A)!;
+  check(dbA.total === DEVICES, `DB total for award ${AWARD_A} = ${DEVICES} (got ${dbA.total}) — nothing lost, nothing doubled`);
+  check(dbA.verified, `verify_tallies(${AWARD_A}) = true (ballots = sum of tallies)`);
+  compareCounts(`award ${AWARD_A} DB`, expectedA, countsOf(dbA));
+  await sleep(500);
+  compareCounts(`award ${AWARD_A} stage (Ably)`, expectedA, countsOf(latestTally));
+  const snapA = await stageSnapshot();
+  check(snapA?.total === dbA.total && snapA.seq === dbA.seq, `stage snapshot = DB (total ${snapA?.total}, seq ${snapA?.seq} vs ${dbA.seq})`);
+  check(latestTally?.seq === dbA.seq, `newest seq on the stage = DB seq (${latestTally?.seq} vs ${dbA.seq}) — no stale message won`);
+
+  // 3. award B — burst inside one second
+  say(`\n## B. ${BURST} votes inside 1 second (award ${AWARD_B})`);
+  await act({ action: "close", award_id: AWARD_A });
+  await act({ action: "open", award_id: AWARD_B, seconds: 0 });
+  await waitFor(() => latestTally?.award_id === AWARD_B, 5_000);
+  const tallyBefore = tallyMessages;
+  const burst: Vote[] = Array.from({ length: BURST }, (_, i) => ({ device: randomUUID(), request: randomUUID(), nominee: (i % 29) + 1 }));
+  const expectedB = new Map<number, number>();
+  for (const v of burst) expectedB.set(v.nominee, (expectedB.get(v.nominee) ?? 0) + 1);
+  const tB = performance.now();
+  const burstOut = await Promise.all(
+    burst.map(async (v, i) => {
+      await sleep((i * 1000) / BURST);
+      return sendVote(AWARD_B, v);
+    }),
+  );
+  const lastAnswer = performance.now();
+  say(`results ${JSON.stringify(byResult(burstOut))} · sent over 1 s, all answered after ${(lastAnswer - tB).toFixed(0)} ms`);
+  say(`POST /api/vote (burst) ${stats(burstOut.map((x) => x.ms))}`);
+  check(burstOut.every((x) => x.result === "counted"), `every burst vote "counted"`);
+  const viaAbly = await waitFor(() => latestTally?.award_id === AWARD_B && latestTally.total === BURST, 15_000);
+  await sleep(2_000); // late, older messages still land after the newest one
+  const gotMsgs = (tallyMessages - tallyBefore) / Math.max(1, TALLY_LISTENERS);
+  say(`tally messages per stage listener during burst: ${gotMsgs.toFixed(0)} for ${BURST} votes (the server sends only the newest snapshot per award — fewer messages, same final total)`);
+  if (viaAbly !== null) {
+    check(true, `stage has the true total ${BURST} over Ably ${viaAbly.toFixed(0)} ms after the last answer (< 15 s)`);
+  } else {
+    // What the real stage does every 15 s (SPEC 1.1 #5)
+    const snap = await stageSnapshot();
+    check(snap?.total === BURST, `Ably fell short (${latestTally?.total}) — the 15 s snapshot resync has the true total ${snap?.total}`);
+  }
+  o = await overview();
+  const dbB = o.tallies.find((t) => t.award_id === AWARD_B)!;
+  check(dbB.total === BURST && dbB.verified, `DB total for award ${AWARD_B} = ${BURST} (got ${dbB.total}) · verify_tallies = ${dbB.verified}`);
+  compareCounts(`award ${AWARD_B} DB`, expectedB, countsOf(dbB));
+
+  // 4. shared IP
+  say(`\n## Connections + shared IP`);
+  check(connectedMax < 200, `max simultaneous Ably connections from this test = ${connectedMax} (< 200 free ceiling; + stage + MC in the real room)`);
+  if (SERVER_LOG) {
+    const lines = (await readFile(SERVER_LOG, "utf8")).split("\n").slice(logStart);
+    const failed = lines.filter((l) => /\[ably\] publish .* failed/.test(l)).length;
+    check(failed === 0, `server log: ${failed} Ably publish refused during the test`);
+  }
+  const r429 = statusCounts.get(429) ?? 0;
+  check(r429 === 0, `no request refused with 429 although every request came from one IP (${[...statusCounts].map(([s, n]) => `${s}×${n}`).join(", ")})`);
+  const dropped = listeners.filter((l) => !l.connected).length;
+  check(dropped === 0, `no listener dropped during the test (${dropped} disconnected)`);
+
+  // 5. clean up
+  await act({ action: "close", award_id: AWARD_B });
+  if (!flag("keep")) {
+    for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
+    await act({ action: "lobby" });
+    say(`awards ${AWARD_A},${AWARD_B} reset to pending · stage back to lobby`);
+  }
+  for (const l of listeners) l.client.close();
+
+  say(`\n${problems.length ? `FAILED ${problems.length}` : "ALL PASS"}`);
+  await mkdir(OUT, { recursive: true });
+  const stamp = started.toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  const target = isLocal ? "local" : new URL(origin).hostname.split(".")[0];
+  await writeFile(`${OUT}/load-${target}-${stamp}.md`, "```\n" + log.join("\n") + "\n```\n");
+  say(`written ${OUT}/load-${target}-${stamp}.md`);
+  process.exit(problems.length ? 1 : 0);
+}
+
+main().catch(async (e) => {
+  console.error(e instanceof Error ? e.message : e);
+  for (const l of listeners) l.client.close();
+  process.exit(2);
+});

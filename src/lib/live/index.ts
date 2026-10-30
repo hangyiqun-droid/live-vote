@@ -48,9 +48,14 @@ export function createLiveFeed(): LiveFeed {
       statusCbs.forEach((cb) => cb(s));
     });
 
-    client.channels.get(CHANNEL_EVENT).subscribe("state", (m: InboundMessage) => {
-      eventCbs.forEach((cb) => cb(m.data as EventState));
-    });
+    // subscribe() also attaches; offline the attach times out and rejects. Ably re-attaches by
+    // itself once the connection is back, so the rejection is expected — never an uncaught error.
+    client.channels
+      .get(CHANNEL_EVENT)
+      .subscribe("state", (m: InboundMessage) => {
+        eventCbs.forEach((cb) => cb(m.data as EventState));
+      })
+      .catch(() => undefined);
   });
 
   return {
