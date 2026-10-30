@@ -23,9 +23,10 @@ import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from 
 // scales the photo up to the tile's height, so the files are picked as if ~1/4 wide.
 const GRID_SIZES = "(max-width: 480px) calc((100vw - 16px) / 4), 116px";
 // Realtime is the main path; these only catch what it missed (SPEC 4.2). A socket can die silently
-// while Ably still says "connected" (phones do this), so a slow check runs even then.
+// while Ably still says "connected" (phones do this), so a check runs even then: 4 s keeps a silent
+// socket to ~5 s stale, and 100 phones make ~25 light reads/s on /api/state (no counts, no cache).
 // Each wait gets ±20% so a room of phones does not poll in step.
-const POLL_CONNECTED_MS = 10_000;
+const POLL_CONNECTED_MS = 4_000;
 const POLL_DOWN_MS = 4_000;
 const POLL_RETRY_MS = 2_000;
 const TICK_GAP_MS = 300; // focus + visibilitychange + pageshow arrive together
@@ -109,7 +110,9 @@ export function VoteClient() {
       if (at - last < TICK_GAP_MS) return;
       last = at;
       clearTimeout(timer);
-      const ok = document.visibilityState === "hidden" || (await fetchState());
+      // A hidden page stops checking; `wake` restarts it the moment the page is back in front
+      if (document.visibilityState === "hidden") return;
+      const ok = await fetchState();
       if (stopped || last !== at) return; // a newer tick owns the timer
       const wait = !ok ? POLL_RETRY_MS : live === "connected" ? POLL_CONNECTED_MS : POLL_DOWN_MS;
       timer = setTimeout(() => void tick(), wait * (0.8 + Math.random() * 0.4));

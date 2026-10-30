@@ -15,7 +15,7 @@ const PASS = process.env.ADMIN_PASSCODE ?? "";
 const SCREEN_OFF_MS = Number(process.env.E2E_SCREEN_OFF_MS ?? 60_000);
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const FOLLOW_MS = 2_000; // brief: the phone follows the MC within 2 s while the screen is on
-const ZOMBIE_MS = 13_000; // silent socket: nothing can tell, so the slow check (10 s ±20%) + a round trip
+const ZOMBIE_MS = 7_000; // silent socket: nothing can tell, so the 4 s check (±20%, up to 4.8 s) + a round trip
 
 const log: string[] = [];
 const problems: string[] = [];
