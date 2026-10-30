@@ -84,22 +84,14 @@
 
 /* ---------- places ---------- */
 
+/* left / top / width come from reveal-layout.ts (inline style) */
 .side {
   position: absolute;
-  top: 300px;
-  width: 560px;
   text-align: center;
 }
 
-.left {
-  left: 40px;
-}
-
-.right {
-  right: 40px;
-}
-
 .placeLabel {
+  white-space: nowrap;
   margin-bottom: 18px;
   font-size: 44px;
   font-weight: 800;
@@ -109,23 +101,28 @@
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
-  gap: 24px;
+  margin: 0 auto;
 }
 
 .center {
   position: absolute;
-  left: 600px;
-  top: 196px;
-  width: 720px;
   text-align: center;
 }
 
-.center .row {
-  gap: 32px;
+/* Crowd mode: the shared vote count, once per place */
+.shared {
+  margin: -6px 0 16px;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 40px;
+  color: #fde68a;
+  animation: rise 500ms ease-out both;
 }
 
 .winLabel {
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   gap: 14px;
@@ -139,6 +136,17 @@
 .winLabel svg {
   width: 60px;
   height: 60px;
+}
+
+/* Crowd mode: a lone winner's column is only ~240 px wide */
+.crowd .winLabel {
+  gap: 10px;
+  font-size: 46px;
+}
+
+.crowd .winLabel svg {
+  width: 46px;
+  height: 46px;
 }
 
 /* Cards flip up (SPEC 5.3 "การ์ดพลิกขึ้น") */
@@ -169,6 +177,29 @@
   aspect-ratio: 3 / 4;
   object-fit: cover;
   object-position: center 30%;
+}
+
+/* Compact tile for big ties: the nickname sits on a dark band over the photo */
+.cardCompact {
+  position: relative;
+  border-radius: 16px;
+  box-shadow: 0 12px 30px rgb(0 0 0 / 0.5);
+}
+
+.cardBand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 18px 4px 6px;
+  background: linear-gradient(transparent, rgb(4 6 14 / 0.88) 45%);
+}
+
+.cardBand .cardNick {
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .cardText {

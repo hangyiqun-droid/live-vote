@@ -2,6 +2,7 @@
 // a stage subscriber on Ably. Votes one at a time with fresh device ids into the open award.
 // Usage: pnpm latency [baseUrl] [count]   e.g. pnpm latency https://<preview>.vercel.app 20
 // Needs an open award (pnpm award open 1). Dev branch / Ably dev app only.
+// Sends VERCEL_AUTOMATION_BYPASS_SECRET from .env.local when set (protected preview).
 import { randomUUID } from "node:crypto";
 import { config } from "dotenv";
 import * as Ably from "ably";
@@ -11,6 +12,13 @@ config({ path: ".env.local", quiet: true });
 
 const base = (process.argv[2] ?? "http://localhost:3155").replace(/\/$/, "") + "";
 const count = Number(process.argv[3] ?? 20);
+// A protected preview needs the bypass on every request (same env name as the load test)
+const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
+const get = (url: string, init: RequestInit = {}) => {
+  const headers = new Headers(init.headers);
+  if (BYPASS) headers.set("x-vercel-protection-bypass", BYPASS);
+  return fetch(url, { ...init, headers });
+};
 
 const pct = (xs: number[], p: number) => {
   const s = [...xs].sort((a, b) => a - b);
@@ -18,7 +26,7 @@ const pct = (xs: number[], p: number) => {
 };
 
 async function main() {
-  const state = (await (await fetch(`${base}/api/state`)).json()) as EventState;
+  const state = (await (await get(`${base}/api/state`)).json()) as EventState;
   const award = state.awards.find((a) => a.status === "open");
   if (!award) throw new Error("no open award — run: pnpm award open 1");
 
@@ -40,7 +48,7 @@ async function main() {
     const nominee = (i % 29) + 1;
     const t0 = performance.now();
     const arrived = new Promise<number>((resolve) => (waiting = { total: total + 1, resolve }));
-    const res = await fetch(`${base}/api/vote`, {
+    const res = await get(`${base}/api/vote`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ award_id: award.id, nominee_id: nominee, request_id: randomUUID(), device_id: randomUUID() }),
@@ -64,7 +72,7 @@ async function main() {
   console.log(`press → tally on Ably sub  : ${fmt(endToEnd)}`);
 
   async function currentTotal(): Promise<number> {
-    const r = await fetch(`${base}/api/stage/snapshot?k=${encodeURIComponent(process.env.STAGE_KEY ?? "")}`);
+    const r = await get(`${base}/api/stage/snapshot?k=${encodeURIComponent(process.env.STAGE_KEY ?? "")}`);
     const j = (await r.json()) as { tally: TallySnapshot | null };
     return j.tally?.total ?? 0;
   }

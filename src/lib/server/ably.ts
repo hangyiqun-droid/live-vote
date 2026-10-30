@@ -1,6 +1,7 @@
 import "server-only";
 import * as Ably from "ably";
 import { CHANNEL_EVENT, CHANNEL_TALLY, type EventState, type TallySnapshot } from "@/lib/types";
+import { createTallyPublisher, type SendResult } from "./tally-lane";
 
 // Ably is only the loudspeaker; Postgres is the ballot box (SPEC 1.1).
 const globalForAbly = globalThis as unknown as { eventAbly?: Ably.Rest };
@@ -51,40 +52,22 @@ async function publish(channel: string, name: string, data: unknown): Promise<bo
   return false;
 }
 
-// M5: a rush of votes must not turn into a rush of publishes — Ably refuses messages above its
-// per-channel / per-account rate (SPEC 1.3) and the stage would sit on a stale total until the
-// 15 s resync. Every snapshot is the whole tally, so per award we keep at most one publish in
-// flight and send only the newest snapshot that queued up behind it. Each caller still waits
-// until a snapshot at least as new as its own has gone out (or failed), so "announce before
-// replying" holds.
-type Lane = { inflight: Promise<void> | null; next: TallySnapshot | null; sentSeq: number; ok: boolean };
-const globalForLanes = globalThis as unknown as { eventTallyLanes?: Map<number, Lane> };
-const lanes = (globalForLanes.eventTallyLanes ??= new Map());
-
-export function publishTally(s: TallySnapshot): Promise<boolean> {
-  let lane = lanes.get(s.award_id);
-  if (!lane) {
-    lane = { inflight: null, next: null, sentSeq: -1, ok: true };
-    lanes.set(s.award_id, lane);
+// One Ably call for the tally lane (src/lib/server/tally-lane.ts), which owns spacing + retries.
+// 42913 = channel.maxRate (50 msg/s per channel) — a rate refusal is worth waiting out.
+async function sendTally(snap: TallySnapshot): Promise<SendResult> {
+  try {
+    await rest().channels.get(CHANNEL_TALLY).publish("tally", snap);
+    return "ok";
+  } catch (e) {
+    const { code, statusCode } = (e ?? {}) as { code?: unknown; statusCode?: unknown };
+    const rate = statusCode === 429 || (typeof code === "number" && code >= 42900 && code < 43000);
+    console.warn(`[ably] publish ${CHANNEL_TALLY} ${rate ? "rate_limited" : "failed"} code=${String(code ?? "unknown")}`);
+    return rate ? "rate_limited" : "failed";
   }
-  const l = lane;
-  if (!l.next || s.seq > l.next.seq) l.next = s;
-  if (!l.inflight) {
-    l.inflight = (async () => {
-      while (l.next) {
-        const snap = l.next;
-        l.next = null;
-        l.ok = await publish(CHANNEL_TALLY, "tally", snap);
-        l.sentSeq = Math.max(l.sentSeq, snap.seq);
-      }
-      l.inflight = null;
-    })();
-  }
-  const mine = s.seq;
-  return (async () => {
-    while (l.sentSeq < mine && l.inflight) await l.inflight;
-    return l.ok;
-  })();
 }
+
+// One lane per award per instance; kept on globalThis so dev hot reloads don't fork it
+const globalForLanes = globalThis as unknown as { eventPublishTally?: (s: TallySnapshot) => Promise<boolean> };
+export const publishTally = (globalForLanes.eventPublishTally ??= createTallyPublisher(sendTally));
 
 export const publishEvent = (s: EventState) => publish(CHANNEL_EVENT, "state", s);

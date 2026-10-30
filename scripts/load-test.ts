@@ -4,6 +4,9 @@
 //   pnpm load [baseUrl] [--devices 150] [--listeners 100] [--burst 100] [--tally-listeners 1]
 //             [--awards 1,2] [--out docs/qa/evidence/m5] [--reset] [--keep] [--yes]
 //             [--server-log /tmp/server.log]   (local only: count "[ably] publish … failed" lines)
+//             [--spread http://localhost:3156,…]   (local only: also send votes to these instances —
+//                                                   round-robin, like Vercel spreading the room
+//                                                   over several function instances)
 //
 // 1. opens <listeners> phone connections (role mobile, event:event only) + <tally-listeners> stage
 //    connections (event:tally) through the app's own /api/realtime/token
@@ -48,6 +51,9 @@ const PASS = process.env.ADMIN_PASSCODE ?? "";
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const SERVER_LOG = opt("server-log", "");
 const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin);
+// Votes go round-robin over these; admin/overview/token/snapshot stay on the first one
+const voteBases = [base, ...opt("spread", "").split(",").filter(Boolean).map((o) => `${o.replace(/\/$/, "")}`)];
+let voteTurn = 0;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const log: string[] = [];
@@ -72,11 +78,12 @@ const stats = (xs: number[]) =>
 let adminCookie = "";
 const statusCounts = new Map<number, number>();
 
-async function http(path: string, init: RequestInit = {}, cookie = ""): Promise<Response> {
+// Every request (votes, MC overview/actions, Ably tokens, stage snapshot) carries the bypass header
+async function http(path: string, init: RequestInit = {}, cookie = "", target = base): Promise<Response> {
   const headers = new Headers(init.headers);
   if (BYPASS) headers.set("x-vercel-protection-bypass", BYPASS);
   if (cookie) headers.set("cookie", cookie);
-  const r = await fetch(`${base}${path}`, { ...init, headers });
+  const r = await fetch(`${target}${path}`, { ...init, headers });
   statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
   return r;
 }
@@ -128,11 +135,17 @@ type VoteOut = { result: string; ms: number; status: number };
 async function sendVote(award: number, v: Vote): Promise<VoteOut> {
   const t0 = performance.now();
   try {
-    const r = await http("/api/vote", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ award_id: award, nominee_id: v.nominee, request_id: v.request, device_id: v.device }),
-    });
+    const target = voteBases[voteTurn++ % voteBases.length];
+    const r = await http(
+      "/api/vote",
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ award_id: award, nominee_id: v.nominee, request_id: v.request, device_id: v.device }),
+      },
+      "",
+      target,
+    );
     const j = (await r.json().catch(() => ({}))) as { result?: string };
     return { result: j.result ?? `http_${r.status}`, ms: performance.now() - t0, status: r.status };
   } catch {
@@ -222,12 +235,13 @@ let logStart = 0;
 // ---- main ---------------------------------------------------------------------------------------
 async function main() {
   if (!K || !PASS) throw new Error("STAGE_KEY and ADMIN_PASSCODE must be in .env.local");
+  if (voteBases.length > 1 && !isLocal) throw new Error("--spread is for local multi-instance runs only");
   if (!isLocal && !flag("yes")) {
     throw new Error(`${origin} is not local — this resets awards ${AWARD_A},${AWARD_B} there. Add --yes if you mean it.`);
   }
   const started = new Date();
   say(`# M5 load test · ${started.toISOString()}`);
-  say(`target ${base} · devices ${DEVICES} · phone listeners ${LISTENERS} · stage listeners ${TALLY_LISTENERS} · burst ${BURST}/1 s · awards ${AWARD_A},${AWARD_B}${BYPASS ? " · vercel bypass on" : ""}`);
+  say(`target ${base}${voteBases.length > 1 ? ` (votes spread over ${voteBases.length} instances)` : ""} · devices ${DEVICES} · phone listeners ${LISTENERS} · stage listeners ${TALLY_LISTENERS} · burst ${BURST}/1 s · awards ${AWARD_A},${AWARD_B}${BYPASS ? " · vercel bypass on" : ""}`);
 
   logStart = SERVER_LOG ? (await readFile(SERVER_LOG, "utf8")).split("\n").length - 1 : 0;
   const health = await (await http("/api/health")).json();
@@ -244,6 +258,7 @@ async function main() {
     throw new Error(`awards not clean (${JSON.stringify(before)}) — add --reset to wipe them first`);
   }
   for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
+  dirty = true;
 
   // 1. listeners
   const tConn = performance.now();
@@ -284,7 +299,7 @@ async function main() {
   check(first.every((x) => x.result === "counted"), `every phone (and every in-flight double send) got "counted"`);
 
   const stageA = await waitFor(() => latestTally?.award_id === AWARD_A && latestTally.total === DEVICES, 15_000);
-  check(stageA !== null, `stage (Ably) shows total ${DEVICES} after the rush${stageA !== null ? ` (+${stageA.toFixed(0)} ms after the last answer)` : ` — has ${latestTally?.total ?? "nothing"}`}`);
+  check(stageA !== null && stageA <= 2_000, `stage (Ably) shows total ${DEVICES} within 2 s of the last answer${stageA !== null ? ` (+${stageA.toFixed(0)} ms)` : ` — has ${latestTally?.total ?? "nothing"}`}`);
 
   // Replays: same request again → counted (not double), new request from the same phone → already_voted
   const replays = await Promise.all([
@@ -331,6 +346,7 @@ async function main() {
   check(burstOut.every((x) => x.result === "counted"), `every burst vote "counted"`);
   const viaAbly = await waitFor(() => latestTally?.award_id === AWARD_B && latestTally.total === BURST, 15_000);
   await sleep(2_000); // late, older messages still land after the newest one
+  check(viaAbly !== null && viaAbly <= 2_000, `newest Ably message = DB within 2 s after the last answer${viaAbly !== null ? ` (${viaAbly.toFixed(0)} ms)` : ` — has ${latestTally?.total ?? "nothing"}`}`);
   const gotMsgs = (tallyMessages - tallyBefore) / Math.max(1, TALLY_LISTENERS);
   say(`tally messages per stage listener during burst: ${gotMsgs.toFixed(0)} for ${BURST} votes (the server sends only the newest snapshot per award — fewer messages, same final total)`);
   if (viaAbly !== null) {
@@ -351,21 +367,17 @@ async function main() {
   if (SERVER_LOG) {
     const lines = (await readFile(SERVER_LOG, "utf8")).split("\n").slice(logStart);
     const failed = lines.filter((l) => /\[ably\] publish .* failed/.test(l)).length;
-    check(failed === 0, `server log: ${failed} Ably publish refused during the test`);
+    const refused = lines.filter((l) => /\[ably\] publish .* rate_limited/.test(l)).length;
+    say(`server log: ${refused} rate refusals (42913, retried with the newest snapshot)`);
+    check(failed === 0, `server log: ${failed} Ably publish errors other than rate refusals`);
   }
   const r429 = statusCounts.get(429) ?? 0;
   check(r429 === 0, `no request refused with 429 although every request came from one IP (${[...statusCounts].map(([s, n]) => `${s}×${n}`).join(", ")})`);
   const dropped = listeners.filter((l) => !l.connected).length;
   check(dropped === 0, `no listener dropped during the test (${dropped} disconnected)`);
 
-  // 5. clean up
-  await act({ action: "close", award_id: AWARD_B });
-  if (!flag("keep")) {
-    for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
-    await act({ action: "lobby" });
-    say(`awards ${AWARD_A},${AWARD_B} reset to pending · stage back to lobby`);
-  }
-  for (const l of listeners) l.client.close();
+  // 5. clean up (also runs from finally on any error, so no award is left open)
+  await cleanup();
 
   say(`\n${problems.length ? `FAILED ${problems.length}` : "ALL PASS"}`);
   await mkdir(OUT, { recursive: true });
@@ -373,11 +385,36 @@ async function main() {
   const target = isLocal ? "local" : new URL(origin).hostname.split(".")[0];
   await writeFile(`${OUT}/load-${target}-${stamp}.md`, "```\n" + log.join("\n") + "\n```\n");
   say(`written ${OUT}/load-${target}-${stamp}.md`);
-  process.exit(problems.length ? 1 : 0);
+  process.exitCode = problems.length ? 1 : 0;
 }
 
-main().catch(async (e) => {
-  console.error(e instanceof Error ? e.message : e);
-  for (const l of listeners) l.client.close();
-  process.exit(2);
-});
+let dirty = false;
+async function cleanup() {
+  if (!dirty) return;
+  dirty = false;
+  try {
+    if (flag("keep")) {
+      // Keep the votes for inspection, but never leave an award open
+      const o = await overview();
+      for (const a of o.state.awards) if (a.status === "open") await act({ action: "close", award_id: a.id });
+      say(`--keep: awards left with their votes (closed)`);
+    } else {
+      for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
+      await act({ action: "lobby" });
+      say(`awards ${AWARD_A},${AWARD_B} reset to pending · stage back to lobby`);
+    }
+  } catch (e) {
+    console.error(`CLEANUP FAILED — reset awards ${AWARD_A},${AWARD_B} by hand: ${e instanceof Error ? e.message : e}`);
+  }
+}
+
+main()
+  .catch(async (e) => {
+    console.error(e instanceof Error ? e.message : e);
+    process.exitCode = 2;
+  })
+  .finally(async () => {
+    await cleanup();
+    for (const l of listeners) l.client.close();
+    process.exit(process.exitCode ?? 0);
+  });

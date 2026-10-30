@@ -20,7 +20,7 @@ import { fetchWithTimeout, uuid4 } from "@/lib/uuid";
 import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from "./vote-store";
 
 // Grid: 3 columns, 12px page padding, 8px gaps → (100vw - 40px) / 3 ≥ 104px at 360px wide (SPEC 4.2)
-const GRID_SIZES = "(max-width: 480px) calc((100vw - 40px) / 3), 147px";
+const GRID_SIZES = "(max-width: 480px) calc((100vw - 32px) / 3), 147px";
 const EAGER_PHOTOS = 12;
 const FALLBACK_POLL_MS = 10_000;
 
@@ -274,7 +274,7 @@ function Header({
 
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-3 gap-2 px-3" aria-busy="true" aria-label="กำลังโหลด">
+    <div className="grid grid-cols-3 gap-2 px-2" aria-busy="true" aria-label="กำลังโหลด">
       {nominees.map((n) => (
         <div key={n.id}>
           <div className={`aspect-[3/4] w-full rounded-lg ${groupStyle[n.group].soft} motion-safe:animate-pulse`} />
@@ -285,9 +285,10 @@ function SkeletonGrid() {
   );
 }
 
+// px-2 (not px-3): at 360 px with a 15 px desktop scrollbar a photo stays ≥ 104 px wide (QA v0.5.0)
 function Grid({ selected, onChoose }: { selected: number | null; onChoose: (id: number) => void }) {
   return (
-    <div className="px-3">
+    <div className="px-2">
       {GROUPS.map((g) => (
         <section key={g} className="mb-5" aria-label={`กลุ่ม ${g}`}>
           <h2 className={`mb-2 text-sm font-extrabold tracking-wide ${groupStyle[g].text}`}>{g}</h2>
