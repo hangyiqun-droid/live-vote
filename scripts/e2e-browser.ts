@@ -119,6 +119,7 @@ async function main() {
   const stage = await sctx.newPage();
   watch(stage, "stage");
   await stage.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
+  await stage.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
   await stage.getByText(/เสียงรวม/).waitFor();
   const shown = async () => Number((await stage.getByText(/เสียงรวม/).innerText()).replace(/[^0-9]/g, ""));
   // Live update while connected

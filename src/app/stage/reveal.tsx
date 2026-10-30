@@ -12,11 +12,11 @@ import r from "./reveal.module.css";
 
 const fmt = (n: number) => n.toLocaleString("th-TH");
 
-type Kind = "title" | "place" | "drum" | "win" | "none";
-type Beat = { at: number; kind: Kind; place?: Place; cues?: CueKey[] };
+export type Kind = "title" | "place" | "drum" | "win" | "none";
+export type Beat = { at: number; kind: Kind; place?: Place; cues?: CueKey[] };
 
 // SPEC 5.3 (~15 s): dim → "และรางวัล … ได้แก่…" → 3rd (left) → 2nd (right) → long drumroll → winner(s)
-function timeline(steps: Place[]): Beat[] {
+export function timeline(steps: Place[]): Beat[] {
   const beats: Beat[] = [{ at: 800, kind: "title", cues: ["sfx_drumroll"] }];
   if (!steps.length) return [...beats, { at: 3200, kind: "none" }];
   let t = 3400;

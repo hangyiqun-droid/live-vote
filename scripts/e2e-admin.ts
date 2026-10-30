@@ -14,7 +14,7 @@ config({ path: ".env.local", quiet: true });
 const base = (process.argv[2] ?? "http://localhost:3157").replace(/\/$/, "") + "";
 const K = process.env.STAGE_KEY ?? "";
 const PASS = process.env.ADMIN_PASSCODE ?? "";
-const OUT = "docs/qa/evidence/m3";
+const OUT = process.env.E2E_OUT ?? "docs/qa/evidence/m3";
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const problems: string[] = [];
@@ -195,6 +195,7 @@ async function main() {
   for (const b of [{ action: "hide", on: false }, { action: "hall", on: false }, { action: "qr_fallback", on: false }, { action: "lobby" }]) await api(b);
 
   await stage.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
+  await stage.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
   await phone.goto(`${base}/`);
   await stage.getByText("รอพิธีกรเปิดรางวัลแรก").waitFor({ timeout: 20000 });
   // A reload would wipe this marker — checked at the end ("ไม่รีเฟรชหน้าใดเลย")

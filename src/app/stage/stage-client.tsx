@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ExclamationTriangleIcon, SignalSlashIcon } from "@heroicons/react/24/solid";
 import { nominees } from "@/data/nominees";
 import { photoSrc } from "@/components/photo";
@@ -9,13 +9,16 @@ import { createStaffFeed, type LiveStatus } from "@/lib/live/staff";
 import type { EventState, TallySnapshot } from "@/lib/types";
 import { fetchWithTimeout } from "@/lib/uuid";
 import { Canvas } from "./canvas";
-import { cue } from "./cues";
+import { cue, type MusicKey } from "./cues";
 import { CountdownCues, OpenIntro } from "./moments";
 import type { QrProps } from "./qr-panel";
 import { RaceView } from "./race-view";
 import { Hall, Reveal } from "./reveal";
 import r from "./reveal.module.css";
 import { Lobby, Pending } from "./scenes";
+import { SoundControls, SoundNotice, StartGate } from "./sound/controls";
+import { SoundDemo } from "./sound/demo";
+import { useShow } from "./sound/use-show";
 import s from "./stage.module.css";
 
 const RESYNC_MS = 15_000;
@@ -42,7 +45,27 @@ function detectMoments(before: EventState, after: EventState, m: Moments): Momen
   return m;
 }
 
-export function StageClient({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProps | null }) {
+const noSubscribe = () => () => undefined;
+
+// /stage?demo=sound opens the sound test page instead of the live screen
+export function StageClient(props: { qr: QrProps; qrFallback: QrProps | null }) {
+  const demo = useSyncExternalStore(
+    noSubscribe,
+    () => new URLSearchParams(window.location.search).get("demo") === "sound",
+    () => false,
+  );
+  return demo ? <SoundDemo /> : <LiveStage {...props} />;
+}
+
+// The music bed that fits what the screen shows (SPEC 6.1)
+function musicFor(state: EventState | null): MusicKey | null {
+  if (!state) return null;
+  const award = state.awards.find((a) => a.id === state.current_award_id);
+  return !state.show_hall && award?.status === "open" ? "bgm_voting" : "bgm_lobby";
+}
+
+function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProps | null }) {
+  const show = useShow();
   const [phase, setPhase] = useState<Phase>("loading");
   const [state, setState] = useState<EventState | null>(null);
   const [clockOffset, setClockOffset] = useState(0);
@@ -161,6 +184,21 @@ export function StageClient({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallbac
     if (moments.close) cue("sfx_close");
   }, [moments.close]);
 
+  const music = musicFor(state);
+  useEffect(() => {
+    if (music) cue(music);
+  }, [music]);
+
+  // Sits on top of every scene below; the screen keeps loading behind it (SPEC 4.1, 6.3)
+  const sound = show.engine ? (
+    <>
+      <SoundNotice engine={show.engine} />
+      <SoundControls engine={show.engine} />
+    </>
+  ) : (
+    <StartGate title={qrMain.eventTitle} onStart={show.start} />
+  );
+
   if (phase === "no_key" || phase === "bad_key") {
     return (
       <Canvas>
@@ -174,7 +212,7 @@ export function StageClient({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallbac
 
   if (!state || photos < nominees.length) {
     return (
-      <Canvas>
+      <Canvas overlay={sound}>
         <div className={s.message} role="status">
           <p>{qrMain.eventTitle}</p>
           <div className={s.progress}>
@@ -194,7 +232,7 @@ export function StageClient({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallbac
   const playReveal = revealed && momentFor(moments.reveal);
 
   return (
-    <Canvas>
+    <Canvas overlay={sound}>
       {state.show_hall ? (
         <Hall awards={state.awards} tallies={tallies} />
       ) : !award ? (

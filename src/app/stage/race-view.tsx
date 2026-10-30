@@ -24,7 +24,7 @@ import {
 } from "./geometry";
 import { groupVars } from "./palette";
 import { QrPanel, type QrProps } from "./qr-panel";
-import { LANES, chasingIds, diffRows, idOrderRows, rankRows, type Row } from "./race";
+import { LANES, chasingIds, diffRows, idOrderRows, raceSound, rankRows, type Row } from "./race";
 import s from "./stage.module.css";
 
 const HIDDEN_BAR = 0.62; // every bar the same length while counts are hidden (SPEC 4.1)
@@ -71,7 +71,11 @@ export function RaceView({
   useLayoutEffect(() => {
     const before = prev.current;
     prev.current = live;
-    if (!before || hide) return; // hidden: no per-person hint of who got the vote
+    if (!before) return;
+    const sound = raceSound(before, live, hide);
+    if (sound.votes) cue("sfx_tick", { votes: sound.votes });
+    if (sound.moment) cue(sound.moment);
+    if (hide) return; // hidden: no per-person hint of who got the vote
     const change = diffRows(before, live);
     const slotOf = new Map(live.map((r) => [r.id, r]));
     const top = Math.max(1, live[0].votes);
@@ -95,11 +99,6 @@ export function RaceView({
       showBadge(p?.badge);
     }
     if (change.newLeader !== null) zoomLane(parts.current.get(change.newLeader)?.inner);
-
-    // Sound hook points for M4 (SPEC 6.1, throttling rules in 6.4 belong to the player)
-    if (change.gained.size) cue("sfx_tick", { votes: [...change.gained.values()].reduce((a, b) => a + b, 0) });
-    if (change.newLeader !== null) cue("sfx_leader");
-    else if ([...change.overtook].some((id) => slotOf.get(id)!.slot < LANES)) cue("sfx_overtake");
   }, [live, hide]);
 
   // Stable so the memoised lanes only re-render when their own numbers change

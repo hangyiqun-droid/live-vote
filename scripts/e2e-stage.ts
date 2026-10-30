@@ -110,6 +110,7 @@ async function main() {
 
   // Lobby → pending → open (empty)
   await page.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
+  await page.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
   await page.getByText("รอพิธีกรเปิดรางวัลแรก").waitFor();
   await sleep(800);
   await page.screenshot({ path: `${OUT}/stage-lobby.jpg`, quality: 82 });

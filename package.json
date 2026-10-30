@@ -1,6 +1,6 @@
 {
   "name": "live-vote",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3154",
@@ -17,7 +17,9 @@
     "e2e": "tsx scripts/e2e-browser.ts",
     "e2e:stage": "tsx scripts/e2e-stage.ts",
     "e2e:admin": "tsx scripts/e2e-admin.ts",
-    "bundle": "tsx scripts/measure-bundle.ts"
+    "bundle": "tsx scripts/measure-bundle.ts",
+    "audio": "tsx scripts/make-audio.ts",
+    "sound:record": "tsx scripts/record-sound.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",

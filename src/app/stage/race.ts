@@ -74,3 +74,21 @@ export function diffRows(prev: Row[], next: Row[]): RaceChange {
   const lead = leaderOf(next);
   return { gained, overtook, newLeader: lead !== null && lead !== leaderOf(prev) ? lead : null };
 }
+
+export type RaceSound = { votes: number; moment: "sfx_leader" | "sfx_overtake" | "sfx_chase" | null };
+
+// Which sounds one commit of the race deserves (SPEC 6.1). While counts are hidden only the
+// tick plays — it tells the room votes are landing without saying for whom (SPEC 4.1).
+export function raceSound(prev: Row[], next: Row[], hide: boolean): RaceSound {
+  const change = diffRows(prev, next);
+  let votes = 0;
+  for (const d of change.gained.values()) votes += d;
+  if (hide) return { votes, moment: null };
+  const slot = new Map(next.map((r) => [r.id, r.slot]));
+  if (change.newLeader !== null) return { votes, moment: "sfx_leader" };
+  if ([...change.overtook].some((id) => slot.get(id)! < LANES)) return { votes, moment: "sfx_overtake" };
+  // A lane that just closed to within one vote of the lane above it
+  const was = chasingIds(prev);
+  const now = [...chasingIds(next)].some((id) => !was.has(id) && change.gained.has(id));
+  return { votes, moment: now ? "sfx_chase" : null };
+}

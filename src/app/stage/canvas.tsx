@@ -4,8 +4,9 @@ import { useLayoutEffect, useRef } from "react";
 import { H, W } from "./geometry";
 import s from "./stage.module.css";
 
-// Designed once at 1920×1080 and scaled to whatever the projector window is (letterboxed)
-export function Canvas({ children }: { children: React.ReactNode }) {
+// Designed once at 1920×1080 and scaled to whatever the projector window is (letterboxed).
+// `overlay` sits on the window itself, unscaled (start gate, sound controls).
+export function Canvas({ children, overlay }: { children: React.ReactNode; overlay?: React.ReactNode }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const fit = () => {
@@ -26,6 +27,7 @@ export function Canvas({ children }: { children: React.ReactNode }) {
         <div className={s.bg} />
         {children}
       </div>
+      {overlay}
     </div>
   );
 }
