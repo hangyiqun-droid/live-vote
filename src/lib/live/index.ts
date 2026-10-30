@@ -12,6 +12,8 @@ export type LiveStatus = "connecting" | "connected" | "disconnected" | "failed";
 export interface LiveFeed {
   onEvent(cb: (s: EventState) => void): void;
   onStatus(cb: (s: LiveStatus) => void): void;
+  // Phone came back to the foreground: try now instead of waiting out Ably's retry timer
+  reconnect(): void;
   close(): void;
 }
 
@@ -28,6 +30,7 @@ export function createLiveFeed(): LiveFeed {
 
   let closed = false;
   let close = () => {};
+  let reconnect = () => {};
 
   // Loaded lazily: keeps the SDK out of the first paint on phones and out of server prerender
   void import("ably/modular").then(({ BaseRealtime, FetchRequest, WebSocketTransport }) => {
@@ -42,6 +45,9 @@ export function createLiveFeed(): LiveFeed {
       plugins: { WebSocketTransport, FetchRequest },
     });
     close = () => client.close();
+    reconnect = () => {
+      if (client.connection.state !== "connected") client.connection.connect();
+    };
 
     client.connection.on((change: ConnectionStateChange) => {
       const s = mapState(change.current);
@@ -61,6 +67,7 @@ export function createLiveFeed(): LiveFeed {
   return {
     onEvent: (cb) => void eventCbs.push(cb),
     onStatus: (cb) => void statusCbs.push(cb),
+    reconnect: () => reconnect(),
     close: () => {
       closed = true;
       close();

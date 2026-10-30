@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowPathIcon,
   CheckCircleIcon,
@@ -14,7 +14,7 @@ import { GROUPS, nomineeById, nominees, type Nominee } from "@/data/nominees";
 import { groupStyle } from "@/components/group";
 import { photoSrc, photoSrcSet } from "@/components/photo";
 import { withBase } from "@/lib/base-path";
-import { createLiveFeed, type LiveStatus } from "@/lib/live";
+import { createLiveFeed, type LiveFeed, type LiveStatus } from "@/lib/live";
 import type { AwardState, EventState } from "@/lib/types";
 import { fetchWithTimeout, uuid4 } from "@/lib/uuid";
 import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from "./vote-store";
@@ -22,22 +22,35 @@ import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from 
 // 29 faces fit one screen (SPEC 4.2). Tiles are ~1/5 of the width, but on a tall phone cover-fit
 // scales the photo up to the tile's height, so the files are picked as if ~1/4 wide.
 const GRID_SIZES = "(max-width: 480px) calc((100vw - 16px) / 4), 116px";
-const FALLBACK_POLL_MS = 10_000;
+// Realtime is the main path; these only catch what it missed (SPEC 4.2). A socket can die silently
+// while Ably still says "connected" (phones do this), so a slow check runs even then.
+// Each wait gets ±20% so a room of phones does not poll in step.
+const POLL_CONNECTED_MS = 10_000;
+const POLL_DOWN_MS = 4_000;
+const POLL_RETRY_MS = 2_000;
+const TICK_GAP_MS = 300; // focus + visibilitychange + pageshow arrive together
 
 type View = { s: EventState; offset: number };
 type SendError = "network" | "invalid_nominee" | null;
+// A pick belongs to one award + round: when the MC moves on it must never follow to the next one
+type Pick = { key: string; nomineeId: number };
+const awardKey = (a: AwardState) => `${a.id}:${a.round}`;
+
+// Screen stays on while the page is in front, where the browser allows it (best effort)
+const keepAwake = () => void navigator.wakeLock?.request("screen").catch(() => undefined);
 
 export function VoteClient() {
   const [view, setView] = useState<View | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [live, setLive] = useState<LiveStatus>("connecting");
   const [now, setNow] = useState(0);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [dismissedPending, setDismissedPending] = useState(false);
+  const [selected, setSelected] = useState<Pick | null>(null);
+  const [dismissedPending, setDismissedPending] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<SendError>(null);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [ballotVersion, setBallotVersion] = useState(0);
+  const feed = useRef<LiveFeed | null>(null);
 
   const applyState = useCallback((s: EventState) => {
     setView((prev) => {
@@ -53,12 +66,14 @@ export function VoteClient() {
       if (!r.ok) throw new Error(String(r.status));
       applyState(await r.json());
       setLoadFailed(false);
+      return true;
     } catch {
       setLoadFailed(true);
+      return false;
     }
   }, [applyState]);
 
-  // Device id, first state, realtime feed
+  // Device id, realtime feed
   useEffect(() => {
     (async () => {
       const local = loadDeviceId();
@@ -75,28 +90,47 @@ export function VoteClient() {
         setDeviceId(local);
       }
     })();
-    queueMicrotask(() => void fetchState());
-    const feed = createLiveFeed();
-    feed.onEvent(applyState);
-    feed.onStatus(setLive);
-    return () => feed.close();
-  }, [applyState, fetchState]);
+    const f = createLiveFeed();
+    feed.current = f;
+    f.onEvent(applyState);
+    f.onStatus(setLive);
+    return () => f.close();
+  }, [applyState]);
 
-  // Realtime is the main path; plain polling only while it is down (SPEC 4.2)
+  // State check: at once on every status change (catches up after a reconnect) and on every
+  // wake-up, then on a timer. A failed check retries soon: the network is often not back yet
+  // in the first moment after unlocking a phone. Never reloads the page.
   useEffect(() => {
-    if (live === "connected") {
-      queueMicrotask(() => void fetchState()); // catch up on anything missed while reconnecting
-      return;
-    }
-    const t = setInterval(() => void fetchState(), FALLBACK_POLL_MS);
-    return () => clearInterval(t);
+    let stopped = false;
+    let timer: ReturnType<typeof setTimeout>;
+    let last = 0;
+    const tick = async () => {
+      const at = Date.now();
+      if (at - last < TICK_GAP_MS) return;
+      last = at;
+      clearTimeout(timer);
+      const ok = document.visibilityState === "hidden" || (await fetchState());
+      if (stopped || last !== at) return; // a newer tick owns the timer
+      const wait = !ok ? POLL_RETRY_MS : live === "connected" ? POLL_CONNECTED_MS : POLL_DOWN_MS;
+      timer = setTimeout(() => void tick(), wait * (0.8 + Math.random() * 0.4));
+    };
+    const wake = () => {
+      if (document.visibilityState === "hidden") return;
+      feed.current?.reconnect();
+      keepAwake();
+      void tick();
+    };
+    queueMicrotask(() => void tick());
+    keepAwake();
+    document.addEventListener("visibilitychange", wake);
+    for (const e of ["focus", "online", "pageshow"]) window.addEventListener(e, wake);
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      document.removeEventListener("visibilitychange", wake);
+      for (const e of ["focus", "online", "pageshow"]) window.removeEventListener(e, wake);
+    };
   }, [live, fetchState]);
-
-  useEffect(() => {
-    const onVisible = () => document.visibilityState === "visible" && void fetchState();
-    document.addEventListener("visibilitychange", onVisible);
-    return () => document.removeEventListener("visibilitychange", onVisible);
-  }, [fetchState]);
 
   const s = view?.s ?? null;
   const openAward = s?.awards.find((a) => a.status === "open") ?? null;
@@ -124,7 +158,13 @@ export function VoteClient() {
     [activeAward?.id, activeAward?.round, ballotVersion],
   );
 
-  const pick = selected ?? (ballot?.outcome === "pending" && !dismissedPending ? ballot.nomineeId : null);
+  const key = activeAward ? awardKey(activeAward) : null;
+  const pick =
+    selected?.key === key
+      ? selected.nomineeId
+      : ballot?.outcome === "pending" && dismissedPending !== key
+        ? ballot.nomineeId
+        : null;
 
   const send = useCallback(
     async (award: AwardState, nomineeId: number) => {
@@ -176,16 +216,18 @@ export function VoteClient() {
   );
 
   const choose = (id: number) => {
-    setSelected(id);
+    if (!key) return;
+    keepAwake(); // Safari only grants this from a tap
+    setSelected({ key, nomineeId: id });
     setSendError(null);
   };
   const cancel = () => {
     setSelected(null);
-    setDismissedPending(true);
+    setDismissedPending(key);
     setSendError(null);
   };
 
-  const offline = live === "disconnected" || live === "failed";
+  const offline = live === "disconnected" || live === "failed" || loadFailed;
   const voting = activeAward !== null && (!ballot || ballot.outcome === "pending");
   const fullGrid = voting || (!s && !loadFailed);
 
@@ -433,6 +475,7 @@ function Done({ ballot }: { ballot: Ballot }) {
     return (
       <Message icon={<CheckCircleIcon className="size-14 text-slate-500" aria-hidden />}>
         เครื่องนี้โหวตรางวัลนี้ไปแล้ว ขอบคุณครับ
+        <StayHint />
       </Message>
     );
   }
@@ -459,6 +502,7 @@ function Done({ ballot }: { ballot: Ballot }) {
           </p>
         </div>
       )}
+      <p className="mt-6 text-base text-slate-600">{STAY_HINT}</p>
     </div>
   );
 }
@@ -469,12 +513,16 @@ function Waiting({ state }: { state: EventState }) {
     return (
       <Message icon={<NoSymbolIcon className="size-14 text-slate-500" aria-hidden />}>
         ปิดโหวตรางวัลนี้แล้ว ขอบคุณที่ร่วมสนุก รอลุ้นผลบนจอใหญ่
+        <StayHint />
       </Message>
     );
   }
   if (current?.status === "revealed") {
     return (
-      <Message icon={<TvIcon className="size-14 text-slate-500" aria-hidden />}>ประกาศผลแล้ว ดูบนจอใหญ่</Message>
+      <Message icon={<TvIcon className="size-14 text-slate-500" aria-hidden />}>
+        ประกาศผลแล้ว ดูบนจอใหญ่
+        <StayHint />
+      </Message>
     );
   }
   const next = current?.status === "pending" ? current : state.awards.find((a) => a.status === "pending");
@@ -488,6 +536,12 @@ function Waiting({ state }: { state: EventState }) {
       )}
     </Message>
   );
+}
+
+const STAY_HINT = "เปิดหน้านี้ค้างไว้ รางวัลถัดไปจะขึ้นเอง ไม่ต้องสแกนใหม่";
+
+function StayHint() {
+  return <span className="mt-4 block text-base font-normal text-slate-600">{STAY_HINT}</span>;
 }
 
 function Message({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {

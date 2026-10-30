@@ -1,6 +1,6 @@
 {
   "name": "live-vote",
-  "version": "0.6.0",
+  "version": "0.6.1",
   "private": true,
   "scripts": {
     "dev": "next dev -p 3154",
@@ -21,6 +21,7 @@
     "e2e:browser": "tsx scripts/e2e-browser.ts",
     "e2e:stage": "tsx scripts/e2e-stage.ts",
     "e2e:admin": "tsx scripts/e2e-admin.ts",
+    "e2e:phone": "tsx scripts/e2e-phone.ts",
     "bundle": "tsx scripts/measure-bundle.ts",
     "shot:reveal": "tsx scripts/shot-reveal.ts",
     "audio": "tsx scripts/make-audio.ts",
