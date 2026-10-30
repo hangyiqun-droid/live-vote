@@ -7,6 +7,8 @@
 //             [--spread http://localhost:3156,…]   (local only: also send votes to these instances —
 //                                                   round-robin, like Vercel spreading the room
 //                                                   over several function instances)
+//             [--connections 48]   keep-alive sockets per host (0 = one fresh socket per request)
+//             [--no-retry]         report the first answer only — no phone-style resend
 //
 // 1. opens <listeners> phone connections (role mobile, event:event only) + <tally-listeners> stage
 //    connections (event:tally) through the app's own /api/realtime/token
@@ -19,6 +21,11 @@
 //    overview) · max Ably connections · p50/p95 · 0 × 429 from one shared IP
 //
 // Everything comes from one machine = one IP, which is the venue Wi-Fi case on purpose.
+// One machine is NOT 150 phones at the TCP level, though: fix2 measured that opening ~170 new
+// TLS sockets at once over a phone hotspot times out even against google.com (UND_ERR_CONNECT_TIMEOUT
+// before any request reaches Vercel). So requests share a bounded keep-alive pool (warmed up
+// first), and — like the real vote page — a send that never got an answer is resent with the
+// same request_id. Every resend is counted and printed; no 5xx answer is ever retried away silently.
 // Needs in .env.local: STAGE_KEY, ADMIN_PASSCODE (same values as the target). Optional:
 // VERCEL_AUTOMATION_BYPASS_SECRET for a protected preview. Ably quota is per *account* —
 // never run this during the real event.
@@ -26,6 +33,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { config } from "dotenv";
 import * as Ably from "ably";
+import { Agent, fetch as uFetch, type RequestInit as URequestInit } from "undici";
 import type { AdminOverview, EventState, TallySnapshot } from "../src/lib/types";
 import { CHANNEL_EVENT, CHANNEL_TALLY } from "../src/lib/types";
 
@@ -51,6 +59,16 @@ const PASS = process.env.ADMIN_PASSCODE ?? "";
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const SERVER_LOG = opt("server-log", "");
 const isLocal = /^http:\/\/(localhost|127\.0\.0\.1)/.test(origin);
+const CONNECTIONS = Number(opt("connections", "48"));
+const RETRY = !flag("no-retry");
+const dispatcher = new Agent({
+  ...(CONNECTIONS > 0 ? { connections: CONNECTIONS } : {}),
+  keepAliveTimeout: 60_000,
+  keepAliveMaxTimeout: 120_000,
+  connect: { timeout: 20_000 },
+  headersTimeout: 30_000,
+  bodyTimeout: 30_000,
+});
 // Votes go round-robin over these; admin/overview/token/snapshot stay on the first one
 const voteBases = [base, ...opt("spread", "").split(",").filter(Boolean).map((o) => `${o.replace(/\/$/, "")}`)];
 let voteTurn = 0;
@@ -77,15 +95,48 @@ const stats = (xs: number[]) =>
 // ---- HTTP -------------------------------------------------------------------------------------
 let adminCookie = "";
 const statusCounts = new Map<number, number>();
+const networkErrors = new Map<string, number>(); // undici cause code → count (never reached an answer)
+const noteNetwork = (e: unknown) => {
+  const c = e as { cause?: { code?: string }; code?: string; name?: string };
+  const code = c?.cause?.code ?? c?.code ?? c?.name ?? "unknown";
+  networkErrors.set(code, (networkErrors.get(code) ?? 0) + 1);
+};
+const fiveXX = () => [...statusCounts].filter(([s]) => s >= 500).reduce((n, [, c]) => n + c, 0);
 
 // Every request (votes, MC overview/actions, Ably tokens, stage snapshot) carries the bypass header
-async function http(path: string, init: RequestInit = {}, cookie = "", target = base): Promise<Response> {
-  const headers = new Headers(init.headers);
+async function http(path: string, init: URequestInit = {}, cookie = "", target = base) {
+  const headers = new Headers(init.headers as HeadersInit | undefined);
   if (BYPASS) headers.set("x-vercel-protection-bypass", BYPASS);
   if (cookie) headers.set("cookie", cookie);
-  const r = await fetch(`${target}${path}`, { ...init, headers });
-  statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
-  return r;
+  try {
+    const r = await uFetch(`${target}${path}`, { ...init, headers, dispatcher });
+    statusCounts.set(r.status, (statusCounts.get(r.status) ?? 0) + 1);
+    return r;
+  } catch (e) {
+    noteNetwork(e);
+    throw e;
+  }
+}
+
+// Open the keep-alive pool before the rush, so the rush is about the app, not about TLS handshakes
+async function warmUp() {
+  const n = CONNECTIONS > 0 ? CONNECTIONS : 0;
+  const t0 = performance.now();
+  const out = await Promise.all(
+    Array.from({ length: n }, async () => {
+      for (let i = 0; i < 3; i++) {
+        try {
+          const r = await http("/api/health");
+          await r.arrayBuffer();
+          return true;
+        } catch {
+          await sleep(500);
+        }
+      }
+      return false;
+    }),
+  );
+  say(`keep-alive pool: ${out.filter(Boolean).length}/${n} sockets warm (${((performance.now() - t0) / 1000).toFixed(1)} s)`);
 }
 
 async function login() {
@@ -101,21 +152,47 @@ async function login() {
     .join("; ");
 }
 
+// Read-only, so a 5xx / lost answer is simply asked again (and still counted in statusCounts)
 async function overview(): Promise<AdminOverview> {
-  const r = await http("/api/admin/overview", {}, adminCookie);
-  if (!r.ok) throw new Error(`overview ${r.status}`);
-  return (await r.json()) as AdminOverview;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const r = await http("/api/admin/overview", {}, adminCookie);
+      if (r.ok) return (await r.json()) as AdminOverview;
+      if (r.status < 500 || attempt >= 5) throw new Error(`overview ${r.status}`);
+    } catch (e) {
+      if (attempt >= 5 || (e instanceof Error && e.message.startsWith("overview"))) throw e;
+    }
+    await sleep(500 * attempt);
+  }
 }
 
+// MC buttons are idempotent (same status again = "unchanged"), so a 5xx or a lost answer is
+// pressed again — the way the MC would — and every extra press is printed
+const adminRetries: string[] = [];
 async function act(body: Record<string, unknown>, okErrors: string[] = []): Promise<AdminOverview> {
-  const r = await http(
-    "/api/admin/action",
-    { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
-    adminCookie,
-  );
-  const j = (await r.json()) as { ok: boolean; error?: string; overview: AdminOverview };
-  if (!j.ok && !okErrors.includes(j.error ?? "")) throw new Error(`admin ${body.action}: ${j.error ?? r.status}`);
-  return j.overview;
+  for (let attempt = 1; ; attempt++) {
+    let why: string;
+    try {
+      const r = await http(
+        "/api/admin/action",
+        { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) },
+        adminCookie,
+      );
+      const j = (await r.json().catch(() => null)) as { ok: boolean; error?: string; overview: AdminOverview } | null;
+      if (j?.overview) {
+        if (!j.ok && !okErrors.includes(j.error ?? "")) throw new Error(`admin ${body.action}: ${j.error ?? r.status}`);
+        return j.overview;
+      }
+      if (r.status < 500) throw new Error(`admin ${body.action}: HTTP ${r.status}`);
+      why = `HTTP ${r.status}`;
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("admin ")) throw e;
+      why = "network error";
+    }
+    adminRetries.push(`${body.action} ${why}`);
+    if (attempt >= 6) throw new Error(`admin ${body.action}: ${why} after ${attempt} tries`);
+    await sleep(500 * attempt);
+  }
 }
 
 // Bring an award back to "pending, 0 votes" from whatever state it is in
@@ -130,10 +207,10 @@ async function resetAward(id: number) {
 const totalOf = (o: AdminOverview, id: number) => o.tallies.find((t) => t.award_id === id)?.total ?? 0;
 
 type Vote = { device: string; request: string; nominee: number };
-type VoteOut = { result: string; ms: number; status: number };
+type VoteOut = { result: string; ms: number; status: number; resends: number };
+let voteResends = 0;
 
-async function sendVote(award: number, v: Vote): Promise<VoteOut> {
-  const t0 = performance.now();
+async function sendOnce(award: number, v: Vote): Promise<{ result: string; status: number }> {
   try {
     const target = voteBases[voteTurn++ % voteBases.length];
     const r = await http(
@@ -147,10 +224,25 @@ async function sendVote(award: number, v: Vote): Promise<VoteOut> {
       target,
     );
     const j = (await r.json().catch(() => ({}))) as { result?: string };
-    return { result: j.result ?? `http_${r.status}`, ms: performance.now() - t0, status: r.status };
+    return { result: j.result ?? `http_${r.status}`, status: r.status };
   } catch {
-    return { result: "network_error", ms: performance.now() - t0, status: 0 };
+    return { result: "network_error", status: 0 };
   }
+}
+
+// Like the vote page: no answer → resend the same request_id (the server never counts it twice).
+// A 5xx is resent too but stays in statusCounts, so the "no 5xx" check still fails on it.
+async function sendVote(award: number, v: Vote): Promise<VoteOut> {
+  const t0 = performance.now();
+  let out = await sendOnce(award, v);
+  let resends = 0;
+  while (RETRY && resends < 3 && (out.status === 0 || out.status >= 500)) {
+    resends += 1;
+    voteResends += 1;
+    await sleep(300 * resends);
+    out = await sendOnce(award, v);
+  }
+  return { ...out, ms: performance.now() - t0, resends };
 }
 
 // ---- Ably listeners ---------------------------------------------------------------------------
@@ -259,6 +351,7 @@ async function main() {
   }
   for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
   dirty = true;
+  await warmUp();
 
   // 1. listeners
   const tConn = performance.now();
@@ -371,6 +464,8 @@ async function main() {
     say(`server log: ${refused} rate refusals (42913, retried with the newest snapshot)`);
     check(failed === 0, `server log: ${failed} Ably publish errors other than rate refusals`);
   }
+  say(`client network errors (no answer at all — never reached the app): ${networkErrors.size ? [...networkErrors].map(([c, n]) => `${c}×${n}`).join(", ") : "none"} · vote resends (same request_id) ${voteResends} · MC re-presses ${adminRetries.length ? adminRetries.join(", ") : "none"}`);
+  check(fiveXX() === 0, `no 5xx answer from the server (${fiveXX()})`);
   const r429 = statusCounts.get(429) ?? 0;
   check(r429 === 0, `no request refused with 429 although every request came from one IP (${[...statusCounts].map(([s, n]) => `${s}×${n}`).join(", ")})`);
   const dropped = listeners.filter((l) => !l.connected).length;
@@ -388,23 +483,35 @@ async function main() {
   process.exitCode = problems.length ? 1 : 0;
 }
 
+// dirty stays true until a cleanup has really finished, so a failed attempt is tried again
+// (QA v0.5.1: a 503 during reset left the awards dirty and the finally-pass skipped them)
 let dirty = false;
 async function cleanup() {
   if (!dirty) return;
-  dirty = false;
-  try {
-    if (flag("keep")) {
-      // Keep the votes for inspection, but never leave an award open
-      const o = await overview();
-      for (const a of o.state.awards) if (a.status === "open") await act({ action: "close", award_id: a.id });
-      say(`--keep: awards left with their votes (closed)`);
-    } else {
-      for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
-      await act({ action: "lobby" });
-      say(`awards ${AWARD_A},${AWARD_B} reset to pending · stage back to lobby`);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      if (flag("keep")) {
+        // Keep the votes for inspection, but never leave an award open
+        const o = await overview();
+        for (const a of o.state.awards) if (a.status === "open") await act({ action: "close", award_id: a.id });
+        say(`--keep: awards left with their votes (closed)`);
+      } else {
+        for (const id of [AWARD_A, AWARD_B]) await resetAward(id);
+        await act({ action: "lobby" });
+        say(`awards ${AWARD_A},${AWARD_B} reset to pending · stage back to lobby`);
+      }
+      dirty = false;
+      return;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (attempt >= 8) {
+        console.error(`CLEANUP FAILED after ${attempt} tries — reset awards ${AWARD_A},${AWARD_B} by hand: ${msg}`);
+        process.exitCode = 2;
+        return;
+      }
+      console.error(`cleanup try ${attempt} failed (${msg}) — trying again`);
+      await sleep(2_000 * attempt);
     }
-  } catch (e) {
-    console.error(`CLEANUP FAILED — reset awards ${AWARD_A},${AWARD_B} by hand: ${e instanceof Error ? e.message : e}`);
   }
 }
 
@@ -416,5 +523,6 @@ main()
   .finally(async () => {
     await cleanup();
     for (const l of listeners) l.client.close();
+    await dispatcher.close().catch(() => undefined);
     process.exit(process.exitCode ?? 0);
   });

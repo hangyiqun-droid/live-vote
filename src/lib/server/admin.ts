@@ -67,7 +67,8 @@ async function run(a: AdminAction): Promise<FnResult> {
     case "reveal":
       return callFn("set_award_status", [a.award_id, "revealed"]);
     case "extend":
-      return callFn("extend_award", [a.award_id, EXTEND_SECONDS]);
+      // Not idempotent (+30 s each run): retry only when Postgres says nothing committed
+      return callFn("extend_award", [a.award_id, EXTEND_SECONDS], "rolled-back");
     case "reset": {
       // Typed award name is checked here too, not only on the page (SPEC 4.3)
       const state = await readEventState();

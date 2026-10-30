@@ -1,5 +1,5 @@
 import "server-only";
-import { callFn, pool } from "@/db/client";
+import { callFn } from "@/db/client";
 import type { EventState, TallySnapshot } from "@/lib/types";
 import { publishEvent, publishTally } from "./ably";
 
@@ -8,9 +8,8 @@ export const readSnapshot = (awardId: number) => callFn<TallySnapshot | null>("a
 
 // Countdown expiry is server-side (SPEC 3.1): any reader closes overdue awards and announces it.
 export async function expireAndRead(): Promise<EventState> {
-  const { rows } = await pool.query<{ ids: number[] }>("select expire_awards() as ids");
+  const ids = (await callFn<number[] | null>("expire_awards")) ?? [];
   const state = await readEventState();
-  const ids = rows[0].ids ?? [];
   if (ids.length > 0) {
     await publishEvent(state);
     for (const id of ids) {
