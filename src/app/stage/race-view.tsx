@@ -25,9 +25,11 @@ import {
 import { groupVars } from "./palette";
 import { QrPanel, type QrProps } from "./qr-panel";
 import { LANES, chasingIds, diffRows, idOrderRows, raceSound, rankRows, type Row } from "./race";
+import { fitTitle } from "./title-fit";
 import s from "./stage.module.css";
 
 const HIDDEN_BAR = 0.62; // every bar the same length while counts are hidden (SPEC 4.1)
+const LONG_TITLE = 26;
 const MAX_DOTS = 8; // light dots per commit — enough to feel busy, cheap at 100 votes / 10 s
 
 type Parts = { inner?: HTMLDivElement | null; flash?: HTMLDivElement | null; badge?: HTMLDivElement | null; face?: HTMLDivElement | null };
@@ -45,7 +47,7 @@ export function RaceView({
   qr: QrProps;
   clockOffset: number;
 }) {
-  const live = useMemo(() => rankRows(tally?.counts ?? []), [tally]);
+  const live = useMemo(() => rankRows(tally?.counts ?? [], tally?.order), [tally]);
 
   // Hiding freezes the lane order where it was (SPEC 4.1). A screen that loads while already
   // hidden has no "where it was", so it uses nominee order instead of leaking the standings.
@@ -114,8 +116,9 @@ export function RaceView({
     <>
       <header className={s.raceHeader}>
         <div>
-          <p>{qr.eventTitle}</p>
-          <h1>{award.title}</h1>
+          {/* A long name takes two lines, so it gets the event line's place above the first lane */}
+          {award.title.length <= LONG_TITLE && <p>{qr.eventTitle}</p>}
+          <h1 style={{ fontSize: fitTitle(award.title, 66, 1240) }}>{award.title}</h1>
         </div>
         <span className={award.status === "open" ? s.status : `${s.status} ${s.statusOff}`}>
           {award.status === "open" ? "เปิดโหวตอยู่" : award.status === "closed" ? "ปิดโหวตแล้ว" : "ประกาศผลแล้ว"}

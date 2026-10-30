@@ -1,12 +1,13 @@
 // M3 acceptance with headless system Chrome: the MC page drives all 5 awards pending → revealed
 // while the stage (1920×1080) and a phone (390×844) follow live — no page is ever reloaded.
 // Covers: wrong passcode, every "กดผิด" undo, hide counts, lobby, hall, backup QR, rename, reset,
-// the MC timer + auto close, and reveal scenes for: plain 1/2/3 · tie at 1st · tie at 2nd ·
-// tie at 3rd · no votes. The phone must never receive a count. Screenshots → docs/qa/evidence/m3/.
+// the MC timer + auto close, and reveal scenes for: plain 1/2/3 · equal scores at 1st, 2nd and 3rd
+// (first to the score ranks higher) · no votes. The phone must never receive a count. Screenshots → docs/qa/evidence/m3/.
 // Usage (dev branch only): pnpm build && pnpm start -p 3157 &  then  pnpm e2e:admin [baseUrl]
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import { config } from "dotenv";
+import { seedAwards } from "../src/data/awards";
 import { chromium, type Locator, type Page } from "playwright-core";
 
 config({ path: ".env.local", quiet: true });
@@ -36,8 +37,9 @@ async function vote(award: number, nominee: number) {
   if (j.result !== "counted") problems.push(`vote ${award}/${nominee}: ${j.result}`);
 }
 
-async function votes(award: number, plan: Record<number, number>) {
-  for (const [id, n] of Object.entries(plan)) for (let i = 0; i < n; i++) await vote(award, Number(id));
+// In the order given: who reaches a score first decides ties
+async function votes(award: number, plan: [number, number][]) {
+  for (const [id, n] of plan) for (let i = 0; i < n; i++) await vote(award, id);
 }
 
 const card = (admin: Page, id: number) => admin.locator(`[data-award="${id}"]`);
@@ -91,7 +93,7 @@ async function openAward(admin: Page, id: number, seconds: 0 | 60 | 90 | 120) {
   await waitStatus(admin, id, "open", `award ${id}: opened from the MC page`);
 }
 
-type Expect = { winners: number[]; second: number[]; third: number[] };
+type Expect = { winners: number[]; second: number[]; third: number[]; tieNotes?: number };
 
 async function revealAndCheck(admin: Page, stage: Page, phone: Page, id: number, exp: Expect | null, label: string) {
   await hold(admin, card(admin, id).getByRole("button", { name: "ประกาศผล" }));
@@ -115,8 +117,11 @@ async function revealAndCheck(admin: Page, stage: Page, phone: Page, id: number,
   const ids = async (sel: string) =>
     (await stage.locator(`${sel} [data-winner]`).evaluateAll((els) => els.map((e) => Number(e.getAttribute("data-winner")))));
   const got = { winners: await ids('[data-place="1"]'), second: await ids('[data-place="2"]'), third: await ids('[data-place="3"]') };
-  check(JSON.stringify(got) === JSON.stringify(exp), `award ${id} (${label}): podium ${JSON.stringify(got)} = expected ${JSON.stringify(exp)}`);
-  if (exp.winners.length > 1) await seen(stage, "ผู้ชนะร่วม", `award ${id}: shared win says "ผู้ชนะร่วม"`, 2000);
+  const want = { winners: exp.winners, second: exp.second, third: exp.third };
+  check(JSON.stringify(got) === JSON.stringify(want), `award ${id} (${label}): podium ${JSON.stringify(got)} = expected ${JSON.stringify(want)}`);
+  check(!(await stage.getByText("ผู้ชนะร่วม").count()), `award ${id}: nobody is called a joint winner`);
+  const notes = await stage.getByText("ถึงคะแนนนี้ก่อน").count();
+  check(notes === (exp.tieNotes ?? 0), `award ${id}: ${exp.tieNotes ?? 0} "ถึงคะแนนนี้ก่อน" note(s) on screen (${notes})`);
 }
 
 async function main() {
@@ -209,7 +214,7 @@ async function main() {
     await api({ action: "unreveal", award_id: id });
     const t = (await (await admin.request.get(`${base}/api/admin/overview`)).json()).state.awards[id - 1].title;
     await api({ action: "reset", award_id: id, confirm: t });
-    await api({ action: "rename", award_id: id, title: `รางวัลที่ ${id}`, subtitle: "" });
+    await api({ action: "rename", award_id: id, title: seedAwards[id - 1].title, subtitle: "" });
   }
   for (const b of [{ action: "hide", on: false }, { action: "hall", on: false }, { action: "qr_fallback", on: false }, { action: "lobby" }]) await api(b);
 
@@ -238,7 +243,7 @@ async function main() {
   check(await card(admin, 2).getByRole("button", { name: "เปิดโหวต" }).isDisabled(), "another award cannot open while award 1 is open (button)");
   const another = await api({ action: "open", award_id: 2, seconds: 0 });
   check(another.status() === 409 && (await another.json()).error === "another_open", "another award cannot open while award 1 is open (server)");
-  await votes(1, { 1: 5, 2: 3, 3: 2, 4: 1 });
+  await votes(1, [[1, 5], [2, 3], [3, 2], [4, 1]]);
   await sleep(1500);
   await stage.screenshot({ path: `${OUT}/stage-open-timer.jpg`, quality: 82 });
   await admin.screenshot({ path: `${OUT}/admin-open.jpg`, quality: 82, fullPage: true });
@@ -286,7 +291,7 @@ async function main() {
 
   // ---- award 2: tie at 1st (the two ดิว), plus a reset on the way ----
   await openAward(admin, 2, 0);
-  await votes(2, { 5: 1 });
+  await votes(2, [[5, 1]]);
   await hold(admin, card(admin, 2).getByRole("button", { name: "ปิดโหวต" }));
   await waitStatus(admin, 2, "closed", "award 2 closed (before reset)");
   await card(admin, 2).getByRole("button", { name: "รีเซ็ตคะแนน" }).click();
@@ -294,30 +299,30 @@ async function main() {
   check(await card(admin, 2).getByRole("button", { name: "ลบคะแนนรางวัลนี้" }).isDisabled(), "reset needs the exact award name");
   const badReset = await api({ action: "reset", award_id: 2, confirm: "ชื่อผิด" });
   check(badReset.status() === 409, "server refuses reset with the wrong name");
-  await card(admin, 2).getByLabel(/พิมพ์ชื่อรางวัล/).fill("รางวัลที่ 2");
+  await card(admin, 2).getByLabel(/พิมพ์ชื่อรางวัล/).fill(seedAwards[1].title);
   await card(admin, 2).getByRole("button", { name: "ลบคะแนนรางวัลนี้" }).click();
   await waitStatus(admin, 2, "pending", "reset → pending with 0 votes");
   await openAward(admin, 2, 0);
-  await votes(2, { 18: 4, 25: 4, 7: 2, 8: 1 });
+  await votes(2, [[25, 4], [18, 4], [7, 2], [8, 1]]); // 25 reaches 4 first, 18 has the lower number
   await hold(admin, card(admin, 2).getByRole("button", { name: "ปิดโหวต" }));
   await waitStatus(admin, 2, "closed", "award 2 closed");
-  await revealAndCheck(admin, stage, phone, 2, { winners: [18, 25], second: [], third: [7] }, "tie-1st");
+  await revealAndCheck(admin, stage, phone, 2, { winners: [25], second: [18], third: [7], tieNotes: 1 }, "tie-1st");
 
   // ---- award 3: tie at 2nd ----
   await openAward(admin, 3, 0);
-  await votes(3, { 10: 5, 11: 3, 12: 3, 13: 1 });
+  await votes(3, [[10, 5], [12, 3], [11, 3], [13, 1]]);
   await hold(admin, card(admin, 3).getByRole("button", { name: "ปิดโหวต" }));
   await waitStatus(admin, 3, "closed", "award 3 closed");
-  await revealAndCheck(admin, stage, phone, 3, { winners: [10], second: [11, 12], third: [] }, "tie-2nd");
+  await revealAndCheck(admin, stage, phone, 3, { winners: [10], second: [12], third: [11], tieNotes: 1 }, "tie-2nd");
 
   // ---- award 4: tie at 3rd, with backup QR switched on while open ----
   await openAward(admin, 4, 0);
   const qrBtn = admin.getByRole("switch", { name: /QR สำรอง/ });
   log.push(`INFO backup QR switch ${(await qrBtn.isDisabled()) ? "disabled (NEXT_PUBLIC_VOTE_URL_FALLBACK not set in .env.local)" : "enabled"}`);
-  await votes(4, { 20: 6, 21: 4, 22: 2, 23: 2, 24: 2 });
+  await votes(4, [[20, 6], [21, 4], [24, 2], [23, 2], [22, 2]]);
   await hold(admin, card(admin, 4).getByRole("button", { name: "ปิดโหวต" }));
   await waitStatus(admin, 4, "closed", "award 4 closed");
-  await revealAndCheck(admin, stage, phone, 4, { winners: [20], second: [21], third: [22, 23, 24] }, "tie-3rd");
+  await revealAndCheck(admin, stage, phone, 4, { winners: [20], second: [21], third: [24], tieNotes: 1 }, "tie-3rd");
 
   // ---- award 5: nobody votes, the MC's 60 s timer closes it by itself ----
   await openAward(admin, 5, 60);
@@ -336,7 +341,9 @@ async function main() {
   await sleep(1800);
   await stage.screenshot({ path: `${OUT}/stage-hall.jpg`, quality: 82 });
   const hall2 = await stage.locator('[data-hall="2"] [data-winner]').count();
-  check(hall2 === 2, `hall: award 2 shows the shared win as 2 cards (${hall2})`);
+  const hallWinner = await stage.locator('[data-hall="2"] [data-winner]').first().getAttribute("data-winner");
+  check(hall2 === 1 && hallWinner === "25", `hall: award 2 shows one winner, no.25 who got there first (${hall2}, ${hallWinner})`);
+  await seen(stage, "ถึงคะแนนนี้ก่อน", "hall: says the win came from reaching the score first", 2000);
   await undo(admin);
   await stage.locator('[data-reveal="5"]').waitFor({ timeout: 8000 });
   check(true, "undo hall → back to the last award");
@@ -360,7 +367,7 @@ async function main() {
     await api({ action: "unreveal", award_id: id });
     const t = (await (await admin.request.get(`${base}/api/admin/overview`)).json()).state.awards[id - 1].title;
     await api({ action: "reset", award_id: id, confirm: t });
-    await api({ action: "rename", award_id: id, title: `รางวัลที่ ${id}`, subtitle: "" });
+    await api({ action: "rename", award_id: id, title: seedAwards[id - 1].title, subtitle: "" });
   }
   for (const b of [{ action: "hide", on: false }, { action: "hall", on: false }, { action: "qr_fallback", on: false }, { action: "lobby" }]) await api(b);
   const final = await (await admin.request.get(`${base}/api/admin/overview`)).json();

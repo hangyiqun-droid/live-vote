@@ -33,6 +33,7 @@ export type TallySnapshot = {
   auto_close_at: string | null;
   total: number;
   counts: [number, number][];
+  order: number[]; // nominee ids, final ranking incl. tie-break (SPEC 5.3) — the times stay in Postgres
 };
 
 // MC page: every award's tally plus the ballot/tally cross-check (verify_tallies)

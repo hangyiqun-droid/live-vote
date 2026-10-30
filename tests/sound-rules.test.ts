@@ -84,7 +84,7 @@ describe("raceSound", () => {
     expect(raceSound(counts({ 1: 2 }), counts({ 1: 3, 5: 2 }), false).votes).toBe(3);
   });
 
-  it("new sole leader → leader sting (not also an overtake)", () => {
+  it("new leader → leader sting (not also an overtake)", () => {
     expect(raceSound(counts({ 1: 3, 2: 2 }), counts({ 1: 3, 2: 4 }), false).moment).toBe("sfx_leader");
   });
 

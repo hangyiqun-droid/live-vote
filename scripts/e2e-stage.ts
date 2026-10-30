@@ -77,7 +77,7 @@ async function onScreen(page: Page): Promise<Map<number, Placed>> {
 
 async function checkMatchesDb(page: Page, label: string) {
   const snap = await snapshot();
-  const expected = rankRows(snap.counts);
+  const expected = rankRows(snap.counts, snap.order);
   const shown = await onScreen(page);
   let bad = 0;
   for (const r of expected) {
@@ -202,6 +202,8 @@ async function main() {
   const snapNow = await snapshot();
   const v = new Map(snapNow.counts);
   if (v.get(18) !== v.get(25)) problems.push(`setup: 18 (${v.get(18)}) and 25 (${v.get(25)}) not tied`);
+  const ahead = snapNow.order.indexOf(18) < snapNow.order.indexOf(25) ? 18 : 25;
+  const behind = ahead === 18 ? 25 : 18;
   let swaps = 0;
   let samples = 0;
   const watchUntil = Date.now() + 17_000;
@@ -211,10 +213,10 @@ async function main() {
     if (k < others.length && Date.now() > watchUntil - 16_000 + k * 1500) void vote(others[k++]);
     const s = await onScreen(page);
     samples++;
-    if (s.get(18)!.slot > s.get(25)!.slot) swaps++;
+    if (s.get(ahead)!.slot > s.get(behind)!.slot) swaps++;
     await sleep(100);
   }
-  log.push(`tie 18 = 25 (${v.get(18)} each): ${samples} samples over 17 s incl. a resync + ${others.length} other votes → 18 above 25 every time: ${swaps === 0}`);
+  log.push(`tie 18 = 25 (${v.get(18)} each): ${samples} samples over 17 s incl. a resync + ${others.length} other votes → ${ahead} (reached it first) above ${behind} every time: ${swaps === 0}`);
   if (swaps) problems.push(`tie swapped ${swaps} times`);
   await checkMatchesDb(page, "after tie watch");
 

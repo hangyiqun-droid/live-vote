@@ -47,7 +47,7 @@ export function AwardCard({ award, tally, current, anotherOpen, clockOffset, bus
   const [timer, setTimer] = useState<number | null>(null);
   const [panel, setPanel] = useState<"none" | "reset" | "rename">("none");
   const total = tally?.total ?? 0;
-  const rows = rankRows(tally?.counts ?? []).filter((r) => r.votes > 0).slice(0, 5);
+  const rows = rankRows(tally?.counts ?? [], tally?.order).filter((r) => r.votes > 0).slice(0, 5);
   const mine = busy?.endsWith(`:${award.id}`) ?? false;
   const locked = busy !== null;
   const name = `"${award.title}"`;

@@ -1,8 +1,9 @@
-// Idempotent seed: 5 awards (temporary names), 29 nominees, the event row, 145 tally rows.
+// Idempotent seed: 5 awards, 29 nominees, the event row, 145 tally rows.
 // Usage: pnpm db:seed   (uses DATABASE_URL_UNPOOLED from .env.local)
 import { config } from "dotenv";
 import { Client } from "pg";
-import { nominees, seedAwards, EVENT_TITLE } from "../src/data/nominees";
+import { seedAwards } from "../src/data/awards";
+import { nominees, EVENT_TITLE } from "../src/data/nominees";
 
 config({ path: ".env.local", quiet: true });
 

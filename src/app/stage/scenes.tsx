@@ -6,6 +6,7 @@ import type { AwardState } from "@/lib/types";
 import { groupVars } from "./palette";
 import { QrCode, type QrProps } from "./qr-panel";
 import { WarmUp } from "./race-view";
+import { fitTitle } from "./title-fit";
 import s from "./stage.module.css";
 
 // current_award_id = null: everyone's face by group, floating slowly (SPEC 4.1 "lobby")
@@ -47,7 +48,7 @@ export function Pending({ award, qr }: { award: AwardState; qr: QrProps }) {
       <div className={s.pending}>
         <div className={s.pendingCard}>
           <p>{qr.eventTitle}</p>
-          <h1>{award.title}</h1>
+          <h1 style={{ fontSize: fitTitle(award.title, 104, 1500) }}>{award.title}</h1>
           {award.subtitle && <h2>{award.subtitle}</h2>}
           <h2>สแกนเตรียมไว้ได้เลย</h2>
         </div>

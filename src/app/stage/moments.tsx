@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { withBase } from "@/lib/base-path";
 import type { AwardState } from "@/lib/types";
 import { cue } from "./cues";
+import { fitTitle } from "./title-fit";
 import r from "./reveal.module.css";
 
 // Award just opened: its title card flies into the middle, then shrinks up into the race header (SPEC 5.2)
@@ -11,7 +12,7 @@ export function OpenIntro({ title, onDone }: { title: string; onDone: () => void
   useEffect(() => cue("sfx_open"), []);
   return (
     <div className={r.openIntro} aria-hidden>
-      <div className={r.openCard} onAnimationEnd={onDone}>
+      <div className={r.openCard} style={{ fontSize: fitTitle(title, 110, 1640) }} onAnimationEnd={onDone}>
         {title}
       </div>
     </div>

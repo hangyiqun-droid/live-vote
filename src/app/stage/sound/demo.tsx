@@ -66,9 +66,9 @@ async function voteStorm(total: number, ms: number, signal: AbortSignal) {
 
 async function reveal(signal: AbortSignal) {
   const places = [
-    { rank: 3, ids: [12], votes: 9 },
-    { rank: 2, ids: [7], votes: 14 },
-    { rank: 1, ids: [3], votes: 21 },
+    { rank: 3, id: 12, votes: 9, wonTie: false },
+    { rank: 2, id: 7, votes: 14, wonTie: false },
+    { rank: 1, id: 3, votes: 21, wonTie: false },
   ];
   let at = 0;
   for (const b of timeline(places)) {

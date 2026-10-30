@@ -8,15 +8,16 @@ import type { AwardState, TallySnapshot } from "@/lib/types";
 import { cue, type CueKey } from "./cues";
 import { groupVars, PALETTE } from "./palette";
 import { podium, type Place } from "./podium";
-import { fitGrid, GAP, nickFit, revealLayout, type Region } from "./reveal-layout";
+import { fitTitle } from "./title-fit";
 import r from "./reveal.module.css";
 
 const fmt = (n: number) => n.toLocaleString("th-TH");
+const TIE_NOTE = ["คะแนนเท่ากัน", "ถึงคะแนนนี้ก่อน"];
 
 export type Kind = "title" | "place" | "drum" | "win" | "none";
 export type Beat = { at: number; kind: Kind; place?: Place; cues?: CueKey[] };
 
-// SPEC 5.3 (~15 s): dim → "และรางวัล … ได้แก่…" → 3rd (left) → 2nd (right) → long drumroll → winner(s)
+// SPEC 5.3 (~15 s): dim → "และรางวัล … ได้แก่…" → 3rd (left) → 2nd (right) → long drumroll → winner
 export function timeline(steps: Place[]): Beat[] {
   const beats: Beat[] = [{ at: 800, kind: "title", cues: ["sfx_drumroll"] }];
   if (!steps.length) return [...beats, { at: 3200, kind: "none" }];
@@ -33,9 +34,8 @@ export function timeline(steps: Place[]): Beat[] {
 // The reveal scene. `play` = the MC pressed "ประกาศผล" while this screen watched; a screen that
 // loads (or reloads) on an already revealed award jumps straight to the final picture (SPEC 6.3).
 export function Reveal({ award, tally, play }: { award: AwardState; tally: TallySnapshot | undefined; play: boolean }) {
-  const pod = useMemo(() => podium(tally?.counts ?? []), [tally]);
+  const pod = useMemo(() => podium(tally?.counts ?? [], tally?.order), [tally]);
   const beats = useMemo(() => timeline(pod.steps), [pod]);
-  const lay = useMemo(() => revealLayout(pod), [pod]);
   const [played, setShown] = useState(0);
   // A still screen always shows every beat — counted from the current podium, because the tally
   // can land a moment after the "revealed" state (it used to freeze on the empty podium's 2 beats)
@@ -44,7 +44,7 @@ export function Reveal({ award, tally, play }: { award: AwardState; tally: Tally
 
   // Faces in the scene use the 360 file (≤ 360×480 on screen, SPEC 5.1) — fetch them right away
   useEffect(() => {
-    for (const p of pod.steps) for (const id of p.ids) new Image().src = photoSrc(id, 360);
+    for (const p of pod.steps) new Image().src = photoSrc(p.id, 360);
   }, [pod]);
 
   // The timeline is built from the podium, so it must not start before the tally has arrived —
@@ -58,7 +58,7 @@ export function Reveal({ award, tally, play }: { award: AwardState; tally: Tally
         setShown((s) => Math.max(s, i + 1));
         b.cues?.forEach((k) => cue(k, { award_id: award.id }));
         if (b.kind === "win" && b.place && confettiRef.current) {
-          confetti(confettiRef.current, b.place.ids.map((id) => nomineeById.get(id)!.group));
+          confetti(confettiRef.current, nomineeById.get(b.place.id)!.group);
         }
       }, b.at),
     );
@@ -71,19 +71,19 @@ export function Reveal({ award, tally, play }: { award: AwardState; tally: Tally
     beats.slice(0, shown).some((b) => b.kind === kind && (!place || b.place === place));
   const at = (place: Place | null) => (place && (seen("place", place) || seen("win", place)) ? place : null);
   const drumming = seen("drum") && !seen("win");
-  const winners = pod.winners && seen("win", pod.winners) ? pod.winners : null;
+  const winner = pod.first && seen("win", pod.first) ? pod.first : null;
 
   return (
-    <div className={[r.scene, !play && r.still, lay.crowd && r.crowd].filter(Boolean).join(" ")} data-reveal={award.id}>
+    <div className={play ? r.scene : `${r.scene} ${r.still}`} data-reveal={award.id}>
       <div className={r.dim} />
       <div className={seen("title") ? (shown > 1 ? `${r.title} ${r.titleUp}` : r.title) : r.hidden}>
         <p>และรางวัล</p>
-        <h1>{award.title}</h1>
+        <h1 style={{ fontSize: fitTitle(award.title, 124, 1780) }}>{award.title}</h1>
         <p>ได้แก่…</p>
       </div>
 
-      <Side place={at(pod.third)} region={lay.left} crowd={lay.crowd} label="อันดับ 3" />
-      <Side place={at(pod.second)} region={lay.right} crowd={lay.crowd} label="อันดับ 2" />
+      <Side place={at(pod.third)} className={r.third} label="อันดับ 3" />
+      <Side place={at(pod.second)} className={r.second} label="อันดับ 2" />
 
       {drumming && (
         <div className={r.drum} aria-hidden>
@@ -93,14 +93,13 @@ export function Reveal({ award, tally, play }: { award: AwardState; tally: Tally
         </div>
       )}
 
-      {winners && lay.center && (
-        <div className={r.center} style={at$(lay.center)} data-place="1">
+      {winner && (
+        <div className={r.center} data-place="1">
           <p className={r.winLabel}>
             <TrophyIcon aria-hidden />
-            {winners.ids.length > 1 ? "ผู้ชนะร่วม" : "ผู้ชนะ"}
+            ผู้ชนะ
           </p>
-          {lay.crowd && winners.ids.length > 1 && <Shared place={winners} />}
-          <Cards place={winners} region={lay.center} big step={Math.min(140, 2400 / winners.ids.length)} />
+          <Card place={winner} big />
         </div>
       )}
 
@@ -115,69 +114,44 @@ export function Reveal({ award, tally, play }: { award: AwardState; tally: Tally
   );
 }
 
-// Column position + card grid come from reveal-layout.ts, so ties up to 29 people stay readable
-const at$ = (g: Region) => ({ left: g.x, top: g.top, width: g.width });
-
-function Side({ place, region, crowd, label }: { place: Place | null; region: Region | null; crowd: boolean; label: string }) {
-  if (!place || !region) return null;
+function Side({ place, className, label }: { place: Place | null; className: string; label: string }) {
+  if (!place) return null;
   return (
-    <div className={r.side} style={at$(region)} data-place={place.rank}>
-      <p className={r.placeLabel}>{place.ids.length > 1 ? `${label} (ร่วม)` : label}</p>
-      {crowd && place.ids.length > 1 && <Shared place={place} />}
-      <Cards place={place} region={region} step={Math.min(120, 2000 / place.ids.length)} />
+    <div className={`${r.side} ${className}`} data-place={place.rank}>
+      <p className={r.placeLabel}>{label}</p>
+      <Card place={place} />
     </div>
   );
 }
 
-// Crowd mode: "ร่วม 20 คน · 2 เสียง" once, because compact tiles carry no vote line
-function Shared({ place }: { place: Place }) {
+function Card({ place, big }: { place: Place; big?: boolean }) {
+  const n = nomineeById.get(place.id)!;
   return (
-    <p className={r.shared}>
-      ร่วม {fmt(place.ids.length)} คน · {fmt(place.votes)} เสียง
-    </p>
-  );
-}
-
-function Cards({ place, region, big, step }: { place: Place; region: Region; big?: boolean; step: number }) {
-  const g = region.grid;
-  const gap = g.mode === "compact" ? GAP.compact : big ? GAP.fullBig : GAP.full;
-  return (
-    <div className={r.row} style={{ width: g.cols * g.tile + gap * (g.cols - 1), gap }}>
-      {place.ids.map((id, i) => (
-        <Card key={id} id={id} votes={place.votes} w={g.tile} big={big} compact={g.mode === "compact"} delay={Math.round(i * step)} />
-      ))}
-    </div>
-  );
-}
-
-function Card({ id, votes, w, big, compact, delay }: { id: number; votes: number; w: number; big?: boolean; compact: boolean; delay: number }) {
-  const n = nomineeById.get(id)!;
-  const cls = [r.card, big && r.cardBig, compact && r.cardCompact].filter(Boolean).join(" ");
-  return (
-    <div className={cls} style={{ ...groupVars(n.group), width: w, animationDelay: `${delay}ms` }} data-winner={id}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-      <img src={photoSrc(id, 360)} width={w} height={Math.round((w * 4) / 3)} alt={`${n.nickname} ${n.group}`} />
-      {compact ? (
-        <div className={r.cardBand}>
-          <p className={r.cardNick} style={{ fontSize: nickFit(w, n.nickname) }}>
-            {n.nickname}
+    <div className={big ? `${r.card} ${r.cardBig}` : r.card} style={groupVars(n.group)} data-winner={place.id}>
+      <div className={r.cardPhoto}>
+        {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
+        <img src={photoSrc(place.id, 360)} width={big ? 360 : 240} height={big ? 480 : 320} alt={`${n.nickname} ${n.group}`} />
+        {place.wonTie && (
+          <p className={r.tieBand}>
+            {TIE_NOTE[0]}
+            <br />
+            {TIE_NOTE[1]}
           </p>
-        </div>
-      ) : (
-        <div className={r.cardText}>
-          <p className={r.cardNick}>{n.nickname}</p>
-          {big && <p className={r.cardFirst}>{n.firstName}</p>}
-          <span className={r.chip}>{n.group}</span>
-          <p className={r.cardVotes}>{fmt(votes)} เสียง</p>
-        </div>
-      )}
+        )}
+      </div>
+      <div className={r.cardText}>
+        <p className={r.cardNick}>{n.nickname}</p>
+        {big && <p className={r.cardFirst}>{n.firstName}</p>}
+        <span className={r.chip}>{n.group}</span>
+        <p className={r.cardVotes}>{fmt(place.votes)} เสียง</p>
+      </div>
     </div>
   );
 }
 
-// ~160 paper pieces in the winners' group colours, animated with transform/opacity only (SPEC 5.5)
-function confetti(layer: HTMLDivElement, groups: Group[]) {
-  const colours = [...new Set(groups.flatMap((g) => PALETTE[g])), "#fde68a", "#ffffff"];
+// ~160 paper pieces in the winner's group colours, animated with transform/opacity only (SPEC 5.5)
+function confetti(layer: HTMLDivElement, group: Group) {
+  const colours = [...PALETTE[group], "#fde68a", "#ffffff"];
   for (let i = 0; i < 160; i++) {
     const p = document.createElement("i");
     p.style.background = colours[i % colours.length];
@@ -199,7 +173,7 @@ function confetti(layer: HTMLDivElement, groups: Group[]) {
   }
 }
 
-// Hall of winners (SPEC 4.1 "ทำเนียบ"): one card per award, shared wins side by side
+// Hall of winners (SPEC 4.1 "ทำเนียบ"): one card per award
 export function Hall({ awards, tallies }: { awards: AwardState[]; tallies: Record<number, TallySnapshot> }) {
   return (
     <div className={r.hall}>
@@ -207,7 +181,7 @@ export function Hall({ awards, tallies }: { awards: AwardState[]; tallies: Recor
       <div className={r.hallRow}>
         {awards.map((a, i) => {
           const t = tallies[a.id];
-          const win = a.status === "revealed" && t?.round === a.round ? podium(t.counts).winners : null;
+          const win = a.status === "revealed" && t?.round === a.round ? podium(t.counts, t.order).first : null;
           return (
             <div key={a.id} className={r.hallAward} style={{ animationDelay: `${i * 160}ms` }} data-hall={a.id}>
               <p className={r.hallName}>{a.title}</p>
@@ -216,29 +190,7 @@ export function Hall({ awards, tallies }: { awards: AwardState[]; tallies: Recor
               ) : !win ? (
                 <p className={r.hallWait}>ไม่มีผู้ได้รับเสียง</p>
               ) : (
-                <>
-                  {win.ids.length > 3 ? (
-                    <HallCrowd ids={win.ids} />
-                  ) : (
-                    <div className={r.hallFaces}>
-                      {win.ids.map((id) => {
-                        const n = nomineeById.get(id)!;
-                        const w = win.ids.length > 1 ? Math.floor(300 / win.ids.length) : 240;
-                        return (
-                          <div key={id} className={r.hallFace} style={groupVars(n.group)} data-winner={id}>
-                            {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-                            <img src={photoSrc(id, 360)} width={w} height={Math.round((w * 4) / 3)} alt={`${n.nickname} ${n.group}`} />
-                            <p className={r.cardNick}>{n.nickname}</p>
-                            <span className={r.chip}>{n.group}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {win.ids.length > 1 && (
-                    <p className={r.hallShared}>{win.ids.length > 3 ? `ผู้ชนะร่วม ${fmt(win.ids.length)} คน` : "ผู้ชนะร่วม"}</p>
-                  )}
-                </>
+                <HallFace place={win} />
               )}
             </div>
           );
@@ -248,27 +200,21 @@ export function Hall({ awards, tallies }: { awards: AwardState[]; tallies: Recor
   );
 }
 
-// More than 3 shared winners in one 344 px hall card: a fitted grid of faces (names when they fit)
-function HallCrowd({ ids }: { ids: number[] }) {
-  const g = fitGrid(ids.length, 312, 560, false, "compact");
+function HallFace({ place }: { place: Place }) {
+  const n = nomineeById.get(place.id)!;
   return (
-    <div className={r.row} style={{ width: g.cols * g.tile + 16 * (g.cols - 1), gap: 16, marginTop: 16 }}>
-      {ids.map((id) => {
-        const n = nomineeById.get(id)!;
-        return (
-          <div key={id} className={`${r.card} ${r.cardCompact}`} style={{ ...groupVars(n.group), width: g.tile, animation: "none" }} data-winner={id}>
-            {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-            <img src={photoSrc(id, 360)} width={g.tile} height={Math.round((g.tile * 4) / 3)} alt={`${n.nickname} ${n.group}`} />
-            {g.tile >= 70 && (
-              <div className={r.cardBand}>
-                <p className={r.cardNick} style={{ fontSize: nickFit(g.tile, n.nickname) }}>
-                  {n.nickname}
-                </p>
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div className={r.hallFace} style={groupVars(n.group)} data-winner={place.id}>
+      {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
+      <img src={photoSrc(place.id, 360)} width={240} height={320} alt={`${n.nickname} ${n.group}`} />
+      <p className={r.cardNick}>{n.nickname}</p>
+      <span className={r.chip}>{n.group}</span>
+      {place.wonTie && (
+        <p className={r.hallTie}>
+          {TIE_NOTE[0]}
+          <br />
+          {TIE_NOTE[1]}
+        </p>
+      )}
     </div>
   );
 }

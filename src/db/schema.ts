@@ -55,11 +55,13 @@ export const ballots = pgTable("ballots", {
   requestId: uuid("request_id").notNull(),
 }, (t) => [primaryKey({ columns: [t.awardId, t.deviceHash] })]);
 
-// Counting board — no device, no time
+// Counting board — no device. last_vote_at breaks ties (SPEC 2.2, 5.3) and never leaves Postgres:
+// snapshots only carry the resulting order
 export const tallies = pgTable("tallies", {
   awardId: smallint("award_id").notNull().references(() => awards.id),
   nomineeId: smallint("nominee_id").notNull().references(() => nominees.id),
   votes: integer("votes").notNull().default(0),
+  lastVoteAt: timestamp("last_vote_at", { withTimezone: true }), // when `votes` reached its current value
 }, (t) => [primaryKey({ columns: [t.awardId, t.nomineeId] })]);
 
 // Admin actions only, never votes

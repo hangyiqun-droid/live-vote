@@ -33,32 +33,41 @@ async function dbTotal(): Promise<{ total: number; counts: Map<number, number> }
   return { total: j.tally.total, counts: new Map(j.tally.counts) };
 }
 
+// SPEC 4.2: all 29 faces on one portrait screen, no vertical scroll, sharp files, big enough to tap
 async function photoCheck(browser: Browser, name: string, viewport: { width: number; height: number }, dpr: number) {
   const ctx = await browser.newContext({ viewport, deviceScaleFactor: dpr, isMobile: true, hasTouch: true, locale: "th-TH" });
   const page = await ctx.newPage();
   watch(page, name);
   await page.goto(base);
   await page.getByRole("button", { name: /ปุ้ย/ }).waitFor();
-  await page.screenshot({ path: `${OUT}/vote-${name}-top.jpg`, quality: 70 });
-  // Scroll through so lazy photos load, then measure every grid photo (SPEC 4.2 row 3)
-  for (let y = 0; y < 4000; y += 400) {
-    await page.mouse.wheel(0, 400);
-    await page.waitForTimeout(80);
-  }
   await page.waitForFunction(() => [...document.querySelectorAll("ul img")].every((i) => (i as HTMLImageElement).complete));
+  await page.screenshot({ path: `${OUT}/vote-${viewport.width}x${viewport.height}.jpg`, quality: 78 });
+  const fit = await page.evaluate(() => ({
+    scroll: document.documentElement.scrollHeight,
+    inner: window.innerHeight,
+    wide: document.documentElement.scrollWidth,
+    vw: window.innerWidth,
+    bottom: Math.max(...[...document.querySelectorAll("ul button")].map((b) => b.getBoundingClientRect().bottom)),
+    tap: Math.min(...[...document.querySelectorAll("ul button")].map((b) => Math.min(b.clientWidth, b.clientHeight))),
+    clipped: [...document.querySelectorAll("ul button span")].filter((e) => e.getBoundingClientRect().height < 12).length,
+  }));
   const rows = await page.$$eval("ul img", (imgs) =>
     imgs.map((el) => {
       const i = el as HTMLImageElement;
-      // naturalWidth is density-corrected with srcset `w`, so use the chosen file's real pixel width
+      // naturalWidth is density-corrected with srcset `w`, so use the chosen file's real pixel width.
+      // A tile taller than 3:4 scales the photo by height, so that is the width that must stay sharp.
       const file = Number(i.currentSrc.split("/").slice(-2)[0]);
-      return { nw: file, cw: i.clientWidth, ch: i.clientHeight, src: i.currentSrc.split("/").slice(-2).join("/") };
+      return { nw: file, cw: i.clientWidth, shown: Math.max(i.clientWidth, (i.clientHeight * 3) / 4), src: i.currentSrc.split("/").slice(-2).join("/") };
     }),
   );
   const need = Math.min(dpr, 3);
-  const sharp = rows.filter((r) => r.nw >= r.cw * need).length;
+  const sharp = rows.filter((r) => r.nw >= Math.min(r.shown * need, 360)).length;
   const minW = Math.min(...rows.map((r) => r.cw));
-  const result = `${name} ${viewport.width}x${viewport.height}@${dpr}: ${rows.length} photos · min width ${minW}px · sharp ${sharp}/${rows.length} · e.g. ${rows[0].src} file ${rows[0].nw}px vs shown ${rows[0].cw}×${need}`;
-  if (sharp !== rows.length || minW < 104 || rows.length !== 29) problems.push(`photo check failed: ${result}`);
+  const result = `${name} ${viewport.width}x${viewport.height}@${dpr}: scrollHeight ${fit.scroll} ≤ innerHeight ${fit.inner} · last tile bottom ${fit.bottom.toFixed(0)} · ${rows.length} photos · min width ${minW}px · smallest tap ${fit.tap}px · sharp ${sharp}/${rows.length} · e.g. ${rows[0].src}`;
+  const small = viewport.width >= 360 && minW < 60;
+  if (fit.scroll > fit.inner || fit.wide > fit.vw || fit.bottom > fit.inner || fit.tap < 44 || fit.clipped || sharp !== rows.length || small || rows.length !== 29) {
+    problems.push(`photo check failed: ${result}`);
+  }
   await ctx.close();
   return result;
 }
@@ -68,9 +77,12 @@ async function main() {
   const browser = await chromium.launch({ executablePath: CHROME, headless: true });
   const log: string[] = [];
 
-  // 1. Face grid sharpness on a narrow iPhone-like and an Android-like viewport
-  log.push(await photoCheck(browser, "iphone", { width: 360, height: 740 }, 3));
+  // 1. One-screen face grid from the smallest supported phone to the largest
+  log.push(await photoCheck(browser, "small", { width: 320, height: 568 }, 2));
+  log.push(await photoCheck(browser, "android-small", { width: 360, height: 640 }, 3));
+  log.push(await photoCheck(browser, "iphone", { width: 390, height: 844 }, 3));
   log.push(await photoCheck(browser, "android", { width: 412, height: 915 }, 2.625));
+  log.push(await photoCheck(browser, "iphone-max", { width: 430, height: 932 }, 3));
 
   // 2. Lost reply then retry → counted exactly once
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 3, isMobile: true, hasTouch: true });

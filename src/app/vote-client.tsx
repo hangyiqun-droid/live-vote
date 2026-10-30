@@ -19,9 +19,9 @@ import type { AwardState, EventState } from "@/lib/types";
 import { fetchWithTimeout, uuid4 } from "@/lib/uuid";
 import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from "./vote-store";
 
-// Grid: 3 columns, 12px page padding, 8px gaps → (100vw - 40px) / 3 ≥ 104px at 360px wide (SPEC 4.2)
-const GRID_SIZES = "(max-width: 480px) calc((100vw - 32px) / 3), 147px";
-const EAGER_PHOTOS = 12;
+// 29 faces fit one screen (SPEC 4.2). Tiles are ~1/5 of the width, but on a tall phone cover-fit
+// scales the photo up to the tile's height, so the files are picked as if ~1/4 wide.
+const GRID_SIZES = "(max-width: 480px) calc((100vw - 16px) / 4), 116px";
 const FALLBACK_POLL_MS = 10_000;
 
 type View = { s: EventState; offset: number };
@@ -186,13 +186,15 @@ export function VoteClient() {
   };
 
   const offline = live === "disconnected" || live === "failed";
+  const voting = activeAward !== null && (!ballot || ballot.outcome === "pending");
+  const fullGrid = voting || (!s && !loadFailed);
 
   return (
-    <main className="mx-auto flex w-full max-w-[480px] flex-1 flex-col pb-10">
-      <Header state={s} award={activeAward} deadline={deadline} serverNow={serverNow} />
+    <main className={`mx-auto flex w-full max-w-[480px] flex-1 flex-col ${fullGrid ? "vote-screen" : "pb-10"}`}>
+      <Header state={s} award={activeAward} deadline={deadline} serverNow={serverNow} voting={voting} />
 
       {offline && s && (
-        <div className="mx-3 mb-3 flex items-center gap-2 rounded-lg bg-slate-200 px-3 py-2 text-sm text-slate-700">
+        <div className="mx-1 mb-1 flex items-center gap-2 rounded-lg bg-slate-200 px-3 py-1 text-sm text-slate-700">
           <SignalSlashIcon className="size-5 shrink-0" aria-hidden />
           กำลังเชื่อมต่อใหม่…
         </div>
@@ -221,13 +223,11 @@ export function VoteClient() {
         <Done ballot={ballot} />
       )}
 
-      {s && activeAward && (!ballot || ballot.outcome === "pending") && (
-        <Grid selected={pick} onChoose={choose} />
-      )}
+      {voting && <Grid selected={pick} onChoose={choose} />}
 
       {s && !activeAward && <Waiting state={s} />}
 
-      {activeAward && pick !== null && (!ballot || ballot.outcome === "pending") && (
+      {activeAward && voting && pick !== null && (
         <ConfirmSheet
           nominee={nomineeById.get(pick)!}
           sending={sending}
@@ -245,21 +245,27 @@ function Header({
   award,
   deadline,
   serverNow,
+  voting,
 }: {
   state: EventState | null;
   award: AwardState | null;
   deadline: number | null;
   serverNow: number;
+  voting: boolean;
 }) {
   const left = award && deadline ? Math.max(0, Math.ceil((deadline - serverNow) / 1000)) : null;
   return (
-    <header className="sticky top-0 z-10 mb-3 bg-slate-900 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] text-white">
-      <p className="text-xs text-slate-300">{state?.title ?? "Founders Awards Night 2026"}</p>
-      <div className="flex items-end justify-between gap-3">
-        <h1 className="text-xl font-extrabold leading-tight">{award ? award.title : "โหวตรางวัล"}</h1>
+    <header
+      className={`bg-slate-900 text-white ${
+        voting ? "px-2 pb-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]" : "sticky top-0 z-10 mb-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
+      }`}
+    >
+      {!voting && <p className="text-xs text-slate-300">{state?.title ?? "Founders Awards Night 2026"}</p>}
+      <div className="flex items-center justify-between gap-2">
+        <h1 className={`font-extrabold leading-tight ${voting ? "text-[15px]" : "text-xl"}`}>{award ? award.title : "โหวตรางวัล"}</h1>
         {left !== null && (
           <p
-            className={`flex items-center gap-1 text-lg font-bold tabular-nums ${left <= 10 ? "text-amber-300" : ""}`}
+            className={`flex shrink-0 items-center gap-1 text-lg font-bold tabular-nums ${left <= 10 ? "text-amber-300" : ""}`}
             aria-label={`เหลือเวลา ${left} วินาที`}
           >
             <ClockIcon className="size-5" aria-hidden />
@@ -267,43 +273,48 @@ function Header({
           </p>
         )}
       </div>
-      {award && <p className="mt-1 text-sm text-slate-300">แตะรูปคนที่อยากโหวตให้</p>}
+      {voting && (
+        <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-slate-300">
+          <p>แตะรูปคนที่อยากโหวตให้</p>
+          <ul className="flex shrink-0 gap-1.5" aria-hidden>
+            {GROUPS.map((g) => (
+              <li key={g} className="flex items-center gap-0.5 text-[9px] font-bold">
+                <span className={`size-2 rounded-sm ${groupStyle[g].bar}`} />
+                {g}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </header>
   );
 }
 
+// Same order as the group frames read: every group stays together without section headings
+const byGroup = GROUPS.flatMap((g) => nominees.filter((n) => n.group === g));
+
+// 5 × 6 cells share whatever height is left under the header, so the page never scrolls (SPEC 4.2)
+const GRID_CLASS = "grid min-h-0 flex-1 grid-cols-5 grid-rows-6 gap-1 p-1";
+
 function SkeletonGrid() {
   return (
-    <div className="grid grid-cols-3 gap-2 px-2" aria-busy="true" aria-label="กำลังโหลด">
-      {nominees.map((n) => (
-        <div key={n.id}>
-          <div className={`aspect-[3/4] w-full rounded-lg ${groupStyle[n.group].soft} motion-safe:animate-pulse`} />
-          <div className="mx-auto mt-1.5 h-4 w-2/3 rounded bg-slate-200" />
-        </div>
+    <div className={GRID_CLASS} aria-busy="true" aria-label="กำลังโหลด">
+      {byGroup.map((n) => (
+        <div key={n.id} className={`rounded-lg border-2 ${groupStyle[n.group].frame} ${groupStyle[n.group].soft} motion-safe:animate-pulse`} />
       ))}
     </div>
   );
 }
 
-// px-2 (not px-3): at 360 px with a 15 px desktop scrollbar a photo stays ≥ 104 px wide (QA v0.5.0)
 function Grid({ selected, onChoose }: { selected: number | null; onChoose: (id: number) => void }) {
   return (
-    <div className="px-2">
-      {GROUPS.map((g) => (
-        <section key={g} className="mb-5" aria-label={`กลุ่ม ${g}`}>
-          <h2 className={`mb-2 text-sm font-extrabold tracking-wide ${groupStyle[g].text}`}>{g}</h2>
-          <ul className="grid grid-cols-3 gap-2">
-            {nominees
-              .filter((n) => n.group === g)
-              .map((n) => (
-                <li key={n.id}>
-                  <Tile nominee={n} selected={selected === n.id} onChoose={onChoose} />
-                </li>
-              ))}
-          </ul>
-        </section>
+    <ul className={GRID_CLASS}>
+      {byGroup.map((n) => (
+        <li key={n.id} className="min-h-0 min-w-0">
+          <Tile nominee={n} selected={selected === n.id} onChoose={onChoose} />
+        </li>
       ))}
-    </div>
+    </ul>
   );
 }
 
@@ -323,7 +334,9 @@ function Tile({
       onClick={() => onChoose(n.id)}
       aria-pressed={selected}
       aria-label={`${n.nickname} (${n.firstName}) กลุ่ม ${n.group}`}
-      className="block w-full text-center"
+      className={`flex size-full flex-col overflow-hidden rounded-lg border-2 bg-white text-center ${
+        selected ? "border-amber-400 ring-2 ring-amber-400" : gs.frame
+      }`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP + srcset, no optimizer (SPEC 4.0) */}
       <img
@@ -333,17 +346,10 @@ function Tile({
         width={120}
         height={160}
         alt=""
-        loading={n.id <= EAGER_PHOTOS ? "eager" : "lazy"}
         decoding="async"
-        // The selection ring is drawn outside the photo (box-shadow) so it never covers the face
-        className={`aspect-[3/4] w-full rounded-lg object-cover object-[center_30%] ${gs.soft} ${
-          selected ? "ring-4 ring-amber-400 ring-offset-2" : ""
-        }`}
+        className={`min-h-0 w-full flex-1 object-cover object-[center_30%] ${gs.soft}`}
       />
-      <span className="mt-1 block truncate text-base font-bold leading-tight">{n.nickname}</span>
-      <span className={`mt-0.5 inline-block rounded px-1.5 text-[11px] font-bold leading-4 ${gs.chip}`}>
-        {n.group}
-      </span>
+      <span className="block w-full shrink-0 truncate px-0.5 text-xs font-bold leading-[1.4]">{n.nickname}</span>
     </button>
   );
 }

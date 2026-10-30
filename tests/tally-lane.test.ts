@@ -12,6 +12,7 @@ const snap = (seq: number): TallySnapshot => ({
   auto_close_at: null,
   total: seq,
   counts: [[1, seq]],
+  order: [1],
 });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 

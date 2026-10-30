@@ -213,7 +213,6 @@
 
 .pendingCard h1 {
   margin-top: 12px;
-  font-size: 104px;
   font-weight: 800;
   line-height: 1.35;
 }
@@ -355,9 +354,8 @@
 }
 
 .raceHeader h1 {
-  font-size: 66px;
   font-weight: 800;
-  line-height: 1.4;
+  line-height: 1.2;
   animation: titleIn 600ms cubic-bezier(0.2, 0.9, 0.25, 1.1) both;
 }
 
@@ -373,6 +371,8 @@
 }
 
 .status {
+  flex: none;
+  white-space: nowrap;
   padding: 8px 22px;
   border-radius: 999px;
   font-size: 30px;

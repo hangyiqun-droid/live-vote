@@ -127,6 +127,62 @@ describe("cast_vote", () => {
   });
 });
 
+describe("tie-break (SPEC 5.3)", () => {
+  // Nominees are numbered so that "first to the score" is never just the lower number
+  const cast = async (plan: number[]) => {
+    for (const n of plan) await vote(n, randomUUID(), randomUUID());
+  };
+
+  it("A reaches 5 before B: A ranks first, whatever the numbers", async () => {
+    await db.query("update tallies set votes = 0, last_vote_at = null where award_id = $1", [AWARD]);
+    await setStatus("open");
+    await cast([18, 25, 25, 25, 25, 25, 18, 18, 18, 18, 7]);
+    const s = await snapshot();
+    expect(votesOf(s, 18)).toBe(5);
+    expect(votesOf(s, 25)).toBe(5);
+    expect(s.order.slice(0, 3)).toEqual([25, 18, 7]);
+    expect(s.order).toHaveLength(29);
+  });
+
+  it("all tied: the order follows who reached the score first, and zero votes rank by number", async () => {
+    await db.query("update tallies set votes = 0, last_vote_at = null where award_id = $1", [AWARD]);
+    await setStatus("open");
+    await cast([9, 3, 21]);
+    const s = await snapshot();
+    expect(s.order.slice(0, 5)).toEqual([9, 3, 21, 1, 2]);
+  });
+
+  it("rows counted before the migration (no time) stay usable and rank after timed ones", async () => {
+    await db.query("update tallies set votes = 0, last_vote_at = null where award_id = $1", [AWARD]);
+    await db.query("update tallies set votes = 2 where award_id = $1 and nominee_id in (4, 2)", [AWARD]);
+    await setStatus("open");
+    await cast([12, 12]);
+    const s = await snapshot();
+    expect(s.order.slice(0, 3)).toEqual([12, 2, 4]);
+  });
+
+  it("a reset wipes the times, so the next round starts level", async () => {
+    await setStatus("open");
+    await cast([28]);
+    await setStatus("closed");
+    await db.query("select reset_award($1)", [AWARD]);
+    const { rows } = await db.query("select count(*)::int n from tallies where award_id = $1 and last_vote_at is not null", [AWARD]);
+    expect(rows[0].n).toBe(0);
+  });
+
+  it("no time ever leaves Postgres, and ballots still has no nominee or time", async () => {
+    await setStatus("open");
+    const r = await vote(5, randomUUID(), randomUUID());
+    expect(JSON.stringify(r)).not.toMatch(/last_vote|\d{4}-\d{2}-\d{2}T/);
+    const { rows } = await db.query(
+      "select column_name c from information_schema.columns where table_name = 'ballots' order by 1",
+    );
+    expect(rows.map((x) => x.c)).toEqual(["award_id", "device_hash", "request_id"]);
+    const t = await db.query("select column_name c from information_schema.columns where table_name = 'tallies'");
+    expect(t.rows.map((x) => x.c).sort()).toEqual(["award_id", "last_vote_at", "nominee_id", "votes"]);
+  });
+});
+
 describe("set_award_status / expire_awards", () => {
   it("allows only one open award at a time", async () => {
     expect((await setStatus("open", null, 1)).ok).toBe(true);

@@ -16,24 +16,27 @@ describe("rankRows", () => {
     expect(rows.map((r) => r.slot)).toEqual([...Array(29).keys()]);
   });
 
-  it("ties sort by nominee number and get a shared rank (1, 1, 3)", () => {
-    const rows = rankRows(counts({ 20: 5, 7: 5, 3: 2 }));
+  it("equal scores follow the server order, then nominee number; nobody shares a rank", () => {
+    const rows = rankRows(counts({ 20: 5, 7: 5, 3: 2 }), [20, 7, 3]);
     expect(rows.slice(0, 3).map((r) => [r.id, r.rank])).toEqual([
-      [7, 1],
       [20, 1],
+      [7, 2],
       [3, 3],
     ]);
-    // everyone on 0 shares rank 4
-    expect(rows.slice(3).every((r) => r.rank === 4)).toBe(true);
+    expect(rows.map((r) => r.rank)).toEqual([...Array(29).keys()].map((i) => i + 1));
+    expect(order({ 20: 5, 7: 5 }).slice(0, 2)).toEqual([7, 20]);
+  });
+
+  it("votes always beat the order", () => {
+    expect(rankRows(counts({ 1: 2, 2: 3 }), [1, 2])[0].id).toBe(2);
   });
 
   it("equal scores never swap lanes when unrelated votes arrive or the same snapshot repeats", () => {
-    const a = order({ 25: 4, 18: 4, 1: 1 });
-    const b = order({ 25: 4, 18: 4, 1: 2 });
-    const c = order({ 25: 4, 18: 4, 1: 2, 29: 3 });
-    for (const o of [a, b, c, order({ 18: 4, 25: 4, 1: 2, 29: 3 })]) {
-      expect(o.indexOf(18)).toBeLessThan(o.indexOf(25));
-    }
+    const tied = [25, 18];
+    const a = rankRows(counts({ 25: 4, 18: 4, 1: 1 }), [...tied, 1]).map((r) => r.id);
+    const b = rankRows(counts({ 25: 4, 18: 4, 1: 2 }), [...tied, 1]).map((r) => r.id);
+    const c = rankRows(counts({ 25: 4, 18: 4, 1: 2, 29: 3 }), [...tied, 29, 1]).map((r) => r.id);
+    for (const o of [a, b, c]) expect(o.indexOf(25)).toBeLessThan(o.indexOf(18));
   });
 
   it("every nominee in the strip can climb into a lane at the right slot", () => {
@@ -69,7 +72,7 @@ describe("change detection", () => {
     expect(diffRows(p, rankRows(counts({ 1: 3, 2: 2, 9: 1 }))).overtook.size).toBe(0); // first vote
   });
 
-  it("reports gains per nominee and a new sole leader", () => {
+  it("reports gains per nominee and a new leader", () => {
     const p = rankRows(counts({ 1: 3, 2: 2 }));
     const c = diffRows(p, rankRows(counts({ 1: 3, 2: 5, 4: 1 })));
     expect(Object.fromEntries(c.gained)).toEqual({ 2: 3, 4: 1 });
@@ -77,8 +80,22 @@ describe("change detection", () => {
     expect(diffRows(p, rankRows(counts({ 1: 4, 2: 2 }))).newLeader).toBeNull(); // same leader
   });
 
-  it("shared first place has no sole leader", () => {
-    expect(leaderOf(rankRows(counts({ 1: 2, 2: 2 })))).toBeNull();
+  it("reaching the leader's score second changes nothing; passing it does", () => {
+    const p = rankRows(counts({ 1: 3, 2: 2 }), [1, 2]);
+    const level = rankRows(counts({ 1: 3, 2: 3 }), [1, 2]);
+    expect(leaderOf(level)).toBe(1);
+    expect(diffRows(p, level).newLeader).toBeNull();
+    const c = diffRows(level, rankRows(counts({ 1: 3, 2: 4 }), [2, 1]));
+    expect(c.newLeader).toBe(2);
+    expect([...c.overtook]).toEqual([2]);
+  });
+
+  it("someone already ahead on equal scores does not overtake by scoring again", () => {
+    const p = rankRows(counts({ 1: 3, 2: 3 }), [2, 1]);
+    expect(diffRows(p, rankRows(counts({ 1: 3, 2: 4 }), [2, 1])).overtook.size).toBe(0);
+  });
+
+  it("an empty board has no leader", () => {
     expect(leaderOf(rankRows([]))).toBeNull();
   });
 
