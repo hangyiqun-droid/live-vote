@@ -1,6 +1,13 @@
 // Lobby greetings (fix9): cleaning, length and the swear-word filter. Pure functions, no I/O, so the
 // server route and the unit tests share one set of rules. The server is the one that decides.
-import { ENGLISH_WORDS, THAI_SUBSTRING, THAI_WHOLE_WORD } from "@/lib/server/profanity-words";
+import {
+  ENGLISH_WORDS,
+  THAI_ALLOWED_EMBEDDED,
+  THAI_ALLOWED_TOKENS,
+  THAI_SUBSTRING,
+  THAI_TONED_SUBSTRING,
+  THAI_WHOLE_WORD,
+} from "@/lib/server/profanity-words";
 import { GREETING_MAX_CHARS } from "@/lib/types";
 
 // Anything longer than this is not a typing slip — refuse before doing any work on it
@@ -25,6 +32,7 @@ const INVISIBLE_RANGES: readonly (readonly [number, number])[] = [
   [0x17b4, 0x17b5], // Khmer inherent vowels
   [0x180b, 0x180f], // Mongolian free variation selectors
   [0x2028, 0x202f], // line/paragraph separators, bidi embeddings, narrow no-break space
+  [0x2800, 0x2800], // braille blank: draws as empty space
   [0x205f, 0x206f],
   [0x3164, 0x3164], // Hangul filler
   [0xfe00, 0xfe0f], // variation selectors
@@ -96,12 +104,20 @@ function fold(raw: string): string {
 // Thai: also without tone marks / thanthakhat / the other U+0E47–0E4E marks ("สั้ส" = "สัส"), and
 // without anything that is not a letter or digit — the text is compared as one run, because Thai
 // has no spaces to cut words on
-const flatKey = (s: string) => fold(s).replace(/[\u0E47-\u0E4E]/g, "").replace(/[^\p{L}\p{N}\p{M}]/gu, "");
+const lettersOnly = (s: string) => s.replace(/[^\p{L}\p{N}\p{M}]/gu, "");
+const flatKey = (s: string) => lettersOnly(fold(s).replace(/[\u0E47-\u0E4E]/g, ""));
+// the same, tone marks kept
+const tonedKey = (s: string) => lettersOnly(fold(s));
 
 // Every character may be repeated: "เหี้ยยยย", "fuuuck". Written as a pattern so "ass" never turns
 // into "as" (squeezing both sides would block the ordinary word)
 const repeated = (key: string) => chars(key).map((c) => `${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`).join("");
 const THAI_SUBSTRING_RE = THAI_SUBSTRING.map((w) => new RegExp(repeated(flatKey(w))));
+const THAI_TONED_RE = THAI_TONED_SUBSTRING.map((w) => new RegExp(repeated(tonedKey(w))));
+// "สัสดี", "โหดเหี้ยม"… are taken out of the run before it is searched; "|" is nothing a word contains,
+// so a gap never glues its neighbours into a rude word
+const ALLOWED_EMBEDDED_RE = THAI_ALLOWED_EMBEDDED.map((w) => new RegExp(repeated(flatKey(w)), "g"));
+const ALLOWED_TOKENS = new Set(THAI_ALLOWED_TOKENS.map(flatKey));
 const THAI_WHOLE_RE = new RegExp(`^(?:${THAI_WHOLE_WORD.map((w) => repeated(flatKey(w))).join("|")})$`);
 
 // English letters and what people write instead: f@ck, sh!t, a$$, b1tch, f*ck
@@ -123,11 +139,17 @@ export function isBlocked(text: string): boolean {
   const folded = fold(text);
   if (LINK.test(folded) || LONG_NUMBER.test(folded)) return true;
 
-  // Thai (and anything else written without spaces): rude words anywhere inside the run …
-  const flat = flatKey(text);
+  // Commas, colons and the middle dot separate words like a space does ("f,u,c,k", "f:u:c:k", "f·uck")
+  const tokens = folded.replace(/[,:\u00B7]/g, " ").split(/\s+/).filter(Boolean);
+
+  // Thai (and anything else written without spaces): rude words anywhere inside the run, once the
+  // ordinary words that merely contain one are taken out …
+  let flat = tokens.map((t) => (ALLOWED_TOKENS.has(flatKey(t)) ? "|" : flatKey(t))).join("");
+  for (const re of ALLOWED_EMBEDDED_RE) flat = flat.replace(re, "|");
   if (THAI_SUBSTRING_RE.some((re) => re.test(flat))) return true;
+  const toned = tokens.map(tonedKey).join("");
+  if (THAI_TONED_RE.some((re) => re.test(toned))) return true;
   // … short ones only as a whole word, so "เชี่ยวชาญ" or "สาดน้ำ" stay fine
-  const tokens = folded.split(/\s+/).filter(Boolean);
   if (tokens.some((t) => THAI_WHOLE_RE.test(flatKey(t)))) return true;
 
   // English: whole words, written plainly or dressed up, then runs of short pieces read as one word

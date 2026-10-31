@@ -25,7 +25,6 @@ export const THAI_SUBSTRING: readonly string[] = [
   "ไอ้สัตว์",
   "อีสัตว์",
   "หน้าหี",
-  "จิ๋ม",
   "เงี่ยน",
   "ขี้หมา",
   "พ่อมึงตาย",
@@ -33,6 +32,24 @@ export const THAI_SUBSTRING: readonly string[] = [
   "ไปตายซะ",
   "ไปตายเถอะ",
 ];
+
+// Rude only WITH their tone mark: the filter ignores tone marks everywhere else ("สั้ส" = "สัส"), but
+// "จิ๋ม" without it is "จิม" — Jim, Jimmy, a very common nickname. Matched on the tone-keeping text.
+export const THAI_TONED_SUBSTRING: readonly string[] = ["จิ๋ม"];
+
+// Ordinary words that contain a rude word, and so would be blocked. They are taken out of the text
+// before the rude words are looked for. Keep this list to whole words; it is a trade: writing one of
+// them directly in front of the rude word hides that word ("ไอ้โหดเหี้ยมาก" is not caught).
+export const THAI_ALLOWED_EMBEDDED: readonly string[] = [
+  "สัสดี", // conscription officer
+  "ขี้หมากฝรั่ง", // chewing gum
+  "โหดเหี้ยม", // brutal
+  "ดอกทองหลาง", // a flower
+];
+
+// Allowed only as a whole space-separated word, because glued to the next word it would hide a rude
+// one ("เหี้ยม" + "ึง"). "เหี้ยม" alone means fierce.
+export const THAI_ALLOWED_TOKENS: readonly string[] = ["เหี้ยม"];
 
 // Short Thai words that are only rude on their own: matched as a whole space-separated word
 // ("เชี่ยวชาญ", "กะหรี่ปั๊บ", "เสือกระดาษ" are ordinary words that contain a rude one)

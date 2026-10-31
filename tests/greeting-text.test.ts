@@ -1,6 +1,7 @@
 // fix9: what a lobby greeting must pass before it may reach the screen
 import { describe, expect, it } from "vitest";
 import { cleanGreeting, isBlocked, sanitize } from "@/lib/greeting-text";
+import { nominees } from "@/data/nominees";
 
 const ok = (t: string) => cleanGreeting(t);
 
@@ -186,5 +187,79 @@ describe("QA v0.7.0 probes (R1)", () => {
     // Spelled with a letter swapped for something this list does not know about, it gets through.
     // The MC switch "ข้อความทักทายขึ้นจอ" exists for exactly this.
     expect(cleanGreeting("phuck").ok).toBe(true);
+  });
+});
+
+// QA v0.7.0 recheck: more separators, the braille blank, and Thai words the list used to hit by accident
+describe("recheck: separators and invisible blanks", () => {
+  it.each([
+    ["f,u,c,k", "f,u,c,k"],
+    ["f:u:c:k", "f:u:c:k"],
+    ["f·uck (middle dot)", "f" + cp(0x00b7) + "uck"],
+    ["f·u·c·k", ["f", "u", "c", "k"].join(cp(0x00b7))],
+    ["fuck,you (comma, no space)", "fuck,you"],
+    ["fuck: (colon after)", "fuck:"],
+    ["fuck + braille blank", "fuck" + cp(0x2800)],
+    ["fu + braille blank + ck", "fu" + cp(0x2800) + "ck"],
+    ["only braille blanks between letters", ["f", "u", "c", "k"].join(cp(0x2800))],
+  ])("blocks %s", (_n, text) => {
+    expect(cleanGreeting(text), _n).toEqual({ ok: false, reason: "blocked" });
+  });
+
+  it("the braille blank never reaches the screen", () => {
+    expect(sanitize("สวัสดี" + cp(0x2800) + "ครับ")).toBe("สวัสดีครับ");
+  });
+});
+
+describe("recheck: ordinary Thai the list used to hit by accident", () => {
+  it.each([
+    "จิม",
+    "จิมมี่",
+    "พี่จิมสู้ๆ",
+    "จิมทอมป์สัน",
+    "สัสดี",
+    "ทหารสัสดี",
+    "ขี้หมากฝรั่ง",
+    "เคี้ยวขี้หมากฝรั่งอยู่",
+    "โหดเหี้ยม",
+    "เหี้ยม",
+    "ดอกทองหลาง",
+  ])("lets %s through", (t) => {
+    expect(cleanGreeting(t).ok, t).toBe(true);
+  });
+
+  it("still blocks every rude word and QA probe those words sit next to", () => {
+    for (const t of [
+      "จิ๋ม",
+      "สัส",
+      "สั" + cp(0x0e49) + "ส",
+      "ไอ้สัส",
+      "สัสสส",
+      "เหี้ย",
+      "ไอ้เหี้ย",
+      "เหี้ยยยย",
+      "เหี้ยมึง", // "เหี้ยม" is only allowed as a word of its own
+      "ขี้หมา",
+      "ไอ้ขี้หมา",
+      "ดอกทอง",
+      "ควย",
+      "ค" + tag("a") + "วย",
+      "fu.ck",
+      "sh!t",
+      "f u c k",
+    ]) {
+      expect(cleanGreeting(t), t).toEqual({ ok: false, reason: "blocked" });
+    }
+  });
+
+  it("no nickname or first name of the 29 nominees is blocked, alone or in a sentence", () => {
+    expect(nominees).toHaveLength(29);
+    for (const n of nominees) {
+      for (const name of [n.nickname, n.firstName]) {
+        for (const text of [name, `ยินดีด้วยนะ ${name}`, `${name}สู้ๆ`, `Go ${name} ${n.group}!`, `${name},${name}`]) {
+          expect(cleanGreeting(text).ok, text).toBe(true);
+        }
+      }
+    }
   });
 });
