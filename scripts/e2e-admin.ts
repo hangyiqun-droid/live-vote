@@ -191,7 +191,7 @@ async function main() {
   for (let i = 0; i < 4; i++) {
     await guest.getByLabel("รหัสพิธีกร").fill(`guess-${i}`);
     await guest.getByRole("button", { name: "เข้าสู่ระบบ" }).click();
-    await guest.getByRole("alert").waitFor();
+    await guest.locator("#passcode-error").waitFor();
     await sleep(300);
   }
   await seen(guest, "ใส่รหัสผิดหลายครั้ง เครื่องนี้ต้องรอ", "guest's own browser is paused after repeated guesses (Thai message)");
