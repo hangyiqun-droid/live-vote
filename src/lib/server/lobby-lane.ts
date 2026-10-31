@@ -94,7 +94,8 @@ export function createCountPublisher(send: (c: ScanCount) => Promise<boolean>, o
         doneAt = Math.max(doneAt, c.at);
         failingSince = 0;
       } else if (Date.now() - (failingSince ||= Date.now()) < opts.giveUpMs) {
-        if (!next || next.at < c.at) next = c;
+        const newer = next as ScanCount | null; // a newer count may have arrived while sending
+        if (!newer || newer.at < c.at) next = c;
         await sleep(opts.retryMs);
       } else {
         ok = false; // the stage's own 15 s resync covers this

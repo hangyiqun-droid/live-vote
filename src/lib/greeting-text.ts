@@ -16,7 +16,28 @@ const chars = (s: string) => Array.from(s);
 
 // Control characters, zero-width and bidi tricks: they cannot be read, only used to dodge the filter
 // or to flip the text around. Tab/newline become spaces first.
-const INVISIBLE = /[\u0000-\u001F\u007F-\u009F­͏؜ᅟᅠ឴឵᠋-᠏​-‏ -  -⁯ㅤ︀-️﻿￹-￼]/g;
+const INVISIBLE_RANGES: readonly (readonly [number, number])[] = [
+  [0x0000, 0x001f], // C0 controls
+  [0x007f, 0x009f], // DEL + C1 controls
+  [0x00ad, 0x00ad], // soft hyphen
+  [0x034f, 0x034f],
+  [0x061c, 0x061c],
+  [0x115f, 0x1160],
+  [0x17b4, 0x17b5],
+  [0x180b, 0x180f],
+  [0x200b, 0x200f], // zero-width space/joiners, direction marks
+  [0x2028, 0x202f], // line/paragraph separators, bidi embeddings
+  [0x205f, 0x206f],
+  [0x3164, 0x3164],
+  [0xfe00, 0xfe0f], // variation selectors
+  [0xfeff, 0xfeff], // BOM / zero-width no-break space
+  [0xfff9, 0xfffc],
+];
+const isInvisible = (c: string) => {
+  const cp = c.codePointAt(0)!;
+  return INVISIBLE_RANGES.some(([a, b]) => cp >= a && cp <= b);
+};
+const removeInvisible = (s: string) => chars(s).filter((c) => !isInvisible(c)).join("");
 const MARK = /\p{M}/u;
 
 function limitMarks(s: string): string {
@@ -35,10 +56,10 @@ export function stripHtml(s: string): string {
 }
 
 export function sanitize(raw: string): string {
-  const cleaned = stripHtml(raw.normalize("NFC").replace(/[\t\r\n  ]/g, " "))
-    .replace(INVISIBLE, "")
-    .replace(/\s+/g, " ")
-    .trim();
+  // Every kind of whitespace (tab, newline, U+2028…) becomes a plain space before the invisible
+  // characters are dropped, so words never glue together
+  const spaced = raw.normalize("NFC").replace(/\s/g, " ");
+  const cleaned = removeInvisible(stripHtml(spaced)).replace(/ +/g, " ").trim();
   return limitMarks(cleaned);
 }
 
