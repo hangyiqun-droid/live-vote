@@ -179,7 +179,11 @@ async function main() {
   if (worstRun > 3) problems.push(`perf: ${worstRun} consecutive frames > 32 ms`);
   if (perf.long.length) problems.push(`perf: ${perf.long.length} long task(s)`);
   await writeFile(`${OUT}/perf-frames.json`, JSON.stringify({ perfLine, frames: perf.frames, long: perf.long }));
-  const trace = await readFile(tracePath);
+  // The trace records the stage URL, which carries the stage key: swap it out before it is written (QA v0.7.0 R5)
+  let trace = await readFile(tracePath, "utf8");
+  for (const k of [process.env.STAGE_KEY, process.env.STAGE_KEY && encodeURIComponent(process.env.STAGE_KEY)]) {
+    if (k) trace = trace.split(k).join("REDACTED");
+  }
   await writeFile(`${tracePath}.gz`, gzipSync(trace));
   await rm(tracePath);
 
