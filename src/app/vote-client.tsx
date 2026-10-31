@@ -18,7 +18,7 @@ import { createLiveFeed, type LiveFeed, type LiveStatus } from "@/lib/live";
 import type { AwardState, EventState } from "@/lib/types";
 import { fetchWithTimeout, uuid4 } from "@/lib/uuid";
 import { GreetingBox } from "./greeting-box";
-import { registerScan } from "./scan";
+import { registerScan, resolveDevice } from "./scan";
 import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from "./vote-store";
 
 // 29 faces fit one screen (SPEC 4.2). Tiles are ~1/5 of the width, but on a tall phone cover-fit
@@ -81,15 +81,10 @@ export function VoteClient() {
     (async () => {
       const local = loadDeviceId();
       try {
-        const r = await fetchWithTimeout(withBase("/api/device"), {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ device_id: local }),
-        });
-        const j = (await r.json()) as { device_id: string };
-        saveDeviceId(j.device_id);
-        setDeviceId(j.device_id);
-        void registerScan(j.device_id); // lobby counter (fix9)
+        const id = await resolveDevice(local);
+        saveDeviceId(id);
+        setDeviceId(id);
+        void registerScan(id); // lobby counter (fix9)
       } catch {
         setDeviceId(local);
         if (local) void registerScan(local);

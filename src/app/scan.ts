@@ -18,3 +18,23 @@ export async function registerScan(deviceId: string): Promise<void> {
     await new Promise((res) => setTimeout(res, 3_000 * (attempt + 1)));
   }
 }
+
+// One /api/device request per page load. A first visit has no cookie yet, so two requests in flight
+// (React Strict Mode runs effects twice in dev) would each mint a different id — and the lobby would
+// count one phone twice.
+let device: Promise<string> | null = null;
+
+export function resolveDevice(local: string | null): Promise<string> {
+  device ??= fetchWithTimeout(withBase("/api/device"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ device_id: local }),
+  })
+    .then(async (r) => (await r.json()) as { device_id: string })
+    .then((j) => j.device_id)
+    .catch((e) => {
+      device = null; // let the next try start fresh
+      throw e;
+    });
+  return device;
+}
