@@ -2,7 +2,7 @@
 import * as Ably from "ably";
 import { afterEach, describe, expect, it } from "vitest";
 import { capabilityFor, createTokenRequest, type Role } from "@/lib/server/ably";
-import { CHANNEL_EVENT, CHANNEL_TALLY } from "@/lib/types";
+import { CHANNEL_EVENT, CHANNEL_LOBBY, CHANNEL_TALLY } from "@/lib/types";
 
 const clients: Ably.Realtime[] = [];
 
@@ -34,6 +34,19 @@ afterEach(() => {
 describe("Ably capabilities by role", () => {
   it("phone capability lists only event:event subscribe", () => {
     expect(capabilityFor("mobile")).toEqual({ [CHANNEL_EVENT]: ["subscribe"] });
+  });
+
+  it("phone token is refused on event:lobby too — greetings and the scan count are for the stage only (fix9)", async () => {
+    expect(await attachError(connect("mobile"), CHANNEL_LOBBY)).toBe(40160);
+    const client = connect("mobile");
+    await expect(client.channels.get(CHANNEL_LOBBY).publish("greet", { items: [] })).rejects.toMatchObject({ code: 40160 });
+  });
+
+  it("stage token hears event:lobby but cannot publish on it; admin has no lobby access", async () => {
+    expect(capabilityFor("stage")[CHANNEL_LOBBY]).toEqual(["subscribe"]);
+    expect(capabilityFor("admin")[CHANNEL_LOBBY]).toBeUndefined();
+    expect(await attachError(connect("stage"), CHANNEL_LOBBY)).toBeNull();
+    await expect(connect("stage").channels.get(CHANNEL_LOBBY).publish("greet", { items: [] })).rejects.toMatchObject({ code: 40160 });
   });
 
   it("phone token can subscribe to event:event", async () => {
