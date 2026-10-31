@@ -35,3 +35,11 @@ export function deviceHash(id: string): Buffer {
   if (!salt) throw new Error("DEVICE_SALT is not set");
   return createHmac("sha256", salt).update(id).digest();
 }
+
+// fix9: the lobby counter's own hash. Domain-separated from deviceHash() so scanned_devices can
+// never be joined to ballots (SPEC 2.2) — same salt, different input.
+export function scanHash(id: string): Buffer {
+  const salt = process.env.DEVICE_SALT;
+  if (!salt) throw new Error("DEVICE_SALT is not set");
+  return createHmac("sha256", salt).update(`scan:${id}`).digest();
+}

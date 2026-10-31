@@ -35,6 +35,7 @@ export const events = pgTable("events", {
   hideCounts: boolean("hide_counts").notNull().default(false),
   showHall: boolean("show_hall").notNull().default(false), // MC put the hall of winners on screen (M3)
   qrFallback: boolean("qr_fallback").notNull().default(false), // stage QR points at the backup URL (SPEC 8.2)
+  greetingsOn: boolean("greetings_on").notNull().default(true), // phones may send lobby greetings (fix9)
   // Bumps on every status/state change — orders event:event messages
   version: bigint("version", { mode: "number" }).notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -63,6 +64,15 @@ export const tallies = pgTable("tallies", {
   votes: integer("votes").notNull().default(0),
   lastVoteAt: timestamp("last_vote_at", { withTimezone: true }), // when `votes` reached its current value
 }, (t) => [primaryKey({ columns: [t.awardId, t.nomineeId] })]);
+
+// fix9: "devices that opened the vote page" for the lobby counter. Its hash is domain-separated
+// from ballots.device_hash (HMAC of "scan:<id>"), so the two tables can never be joined. No
+// nominee, no message, no IP. last_greet_at only paces greetings (1 per device per 10 s) — the
+// greeting text itself is never stored anywhere.
+export const scannedDevices = pgTable("scanned_devices", {
+  deviceHash: bytea("device_hash").primaryKey(),
+  lastGreetAt: timestamp("last_greet_at", { withTimezone: true }),
+});
 
 // Admin actions only, never votes
 export const adminLog = pgTable("admin_log", {
