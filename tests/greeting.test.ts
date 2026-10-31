@@ -199,9 +199,16 @@ describe("scan counter race (R2): the count belongs to the commit", () => {
     const pool = Array.from({ length: 8 }, () => new Client({ connectionString: url }));
     await Promise.all(pool.map((c) => c.connect()));
     try {
-      const answers = await Promise.all(
-        Array.from({ length: 40 }, (_, i) => pool[i % pool.length].query("select register_scan($1) as r", [hash()]).then((x) => x.rows[0].r as { count: number; rev: number })),
-      );
+      // 8 connections, 5 phones each: the connections run side by side, each works through its own phones in order
+      const answers = (
+        await Promise.all(
+          pool.map(async (c) => {
+            const mine: { count: number; rev: number }[] = [];
+            for (let i = 0; i < 5; i++) mine.push((await c.query("select register_scan($1) as r", [hash()])).rows[0].r);
+            return mine;
+          }),
+        )
+      ).flat();
       const revs = answers.map((x) => x.rev);
       expect(new Set(revs).size).toBe(40);
       const last = answers.reduce((m, x) => (x.rev > m.rev ? x : m));
@@ -218,18 +225,15 @@ describe("scan counter race (R2): the count belongs to the commit", () => {
     const pool = Array.from({ length: 6 }, () => new Client({ connectionString: url }));
     await Promise.all(pool.map((c) => c.connect()));
     try {
-      const jobs: Promise<unknown>[] = [];
-      for (let i = 0; i < 60; i++) {
-        const c = pool[i % pool.length];
-        const kind = i % 6;
-        jobs.push(
-          kind === 0
-            ? c.query("select reset_scans()")
-            : kind === 1 || kind === 2
-              ? c.query("select greeting_gate($1, 10, $2, 100)", [hash(), req()])
-              : c.query("select register_scan($1)", [hash()]),
-        );
-      }
+      // each connection works through its own share in order; the six run side by side
+      const jobs = pool.map(async (c, ci) => {
+        for (let i = ci; i < 60; i += pool.length) {
+          const kind = i % 6;
+          if (kind === 0) await c.query("select reset_scans()");
+          else if (kind === 1 || kind === 2) await c.query("select greeting_gate($1, 10, $2, 100)", [hash(), req()]);
+          else await c.query("select register_scan($1)", [hash()]);
+        }
+      });
       await expect(Promise.all(jobs)).resolves.toBeDefined();
     } finally {
       await Promise.all(pool.map((c) => c.end()));
