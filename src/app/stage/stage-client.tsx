@@ -225,7 +225,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
   }
 
   const award = state.awards.find((a) => a.id === state.current_award_id) ?? null;
-  // The backup switch swaps the web address shown on the open screen
+  // The backup switch swaps the lobby QR and the small address on the open screen
   const link = state.qr_fallback && linkFallback ? linkFallback : linkMain;
   const tally = award && tallies[award.id]?.round === award.round ? tallies[award.id] : undefined;
   const momentFor = (k: string | null) => !!award && !!k && k.startsWith(`${award.id}:${award.round}:`);
@@ -237,7 +237,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
       {state.show_hall ? (
         <Hall awards={state.awards} tallies={tallies} />
       ) : !award ? (
-        <Lobby title={state.title} />
+        <Lobby title={state.title} link={link} />
       ) : award.status === "pending" ? (
         <Pending award={award} eventTitle={link.eventTitle} />
       ) : (

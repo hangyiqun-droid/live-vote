@@ -158,7 +158,7 @@ export function RaceView({
         </>
       )}
 
-      <VotePanel {...link} total={total} award={award} clockOffset={clockOffset} />
+      <VotePanel urlLabel={link.urlLabel} total={total} award={award} clockOffset={clockOffset} />
     </>
   );
 }

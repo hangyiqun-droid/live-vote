@@ -7,15 +7,17 @@ import { groupVars } from "./palette";
 import { WarmUp } from "./race-view";
 import { fitTitle } from "./title-fit";
 import s from "./stage.module.css";
+import { QrCode, type LinkProps } from "./vote-panel";
 
-// current_award_id = null: everyone's face by group, floating slowly (SPEC 4.1 "lobby")
-export function Lobby({ title }: { title: string }) {
+// current_award_id = null: everyone's face by group, floating slowly, QR on the right — the only
+// QR on the stage, so first-time voters can get in (SPEC 4.1 "lobby")
+export function Lobby({ title, link }: { title: string; link: LinkProps }) {
   return (
     <>
       <WarmUp />
       <div className={s.lobbyTitle}>
         <p>ร่วมโหวตรางวัลสด</p>
-        <h1>{title}</h1>
+        <h1 style={{ fontSize: fitTitle(title, 76, 1240) }}>{title}</h1>
       </div>
       <div className={s.lobbyRows}>
         {GROUPS.map((g) => (
@@ -34,6 +36,11 @@ export function Lobby({ title }: { title: string }) {
           </div>
         ))}
       </div>
+      <aside className={s.lobbyQr}>
+        <QrCode qr={link.qr} px={400} />
+        <p className={s.qrHint}>สแกนเพื่อโหวต</p>
+        <p className={s.qrUrl}>{link.urlLabel}</p>
+      </aside>
       <p className={s.lobbyWait}>รอพิธีกรเปิดรางวัลแรก</p>
     </>
   );

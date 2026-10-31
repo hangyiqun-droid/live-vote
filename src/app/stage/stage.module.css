@@ -92,7 +92,7 @@
   position: absolute;
   top: 70px;
   left: 0;
-  right: 0;
+  right: 620px; /* the QR column takes the right 620 px */
   text-align: center;
 }
 
@@ -113,7 +113,7 @@
   position: absolute;
   top: 270px;
   left: 0;
-  right: 0;
+  right: 620px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -164,11 +164,47 @@
   }
 }
 
+.lobbyQr {
+  position: absolute;
+  top: 270px;
+  right: 0;
+  width: 620px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qrCard {
+  padding: 18px;
+  border-radius: 28px;
+  background: #fff;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.5);
+  animation: cardIn 600ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.qrCard svg {
+  display: block;
+}
+
+.qrHint {
+  margin-top: 30px;
+  font-size: 46px;
+  font-weight: 700;
+  color: rgb(255 255 255 / 0.85);
+}
+
+.qrUrl {
+  margin-top: 6px;
+  font-size: 40px;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
 .lobbyWait {
   position: absolute;
   bottom: 70px;
   left: 0;
-  right: 0;
+  right: 620px;
   text-align: center;
   font-size: 46px;
   font-weight: 700;

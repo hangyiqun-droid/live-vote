@@ -7,9 +7,20 @@ import { Count } from "./count";
 import s from "./stage.module.css";
 
 export type LinkProps = {
+  qr: { size: number; d: string }; // drawn on the lobby only
   urlLabel: string; // "vote.example.com"
   eventTitle: string;
 };
+
+export function QrCode({ qr, px }: { qr: LinkProps["qr"]; px: number }) {
+  return (
+    <div className={s.qrCard}>
+      <svg width={px} height={px} viewBox={`0 0 ${qr.size} ${qr.size}`} shapeRendering="crispEdges" role="img" aria-label="QR โหวต">
+        <path d={qr.d} fill="#0b1026" />
+      </svg>
+    </div>
+  );
+}
 
 // Right ~30%: running total, countdown, and a small "vote on your phone" line for late arrivals.
 // No QR here on purpose: phones follow the MC on their own, a QR on screen made people rescan (SPEC 4.1)
@@ -18,7 +29,7 @@ export function VotePanel({
   total,
   award,
   clockOffset,
-}: LinkProps & { total: number; award: AwardState; clockOffset: number }) {
+}: Pick<LinkProps, "urlLabel"> & { total: number; award: AwardState; clockOffset: number }) {
   const totalRef = useRef<HTMLDivElement>(null);
   const last = useRef(total);
 
