@@ -116,7 +116,7 @@ async function main() {
   await page.screenshot({ path: `${OUT}/stage-lobby.jpg`, quality: 82 });
 
   award("current", String(AWARD));
-  await page.getByText("สแกนเตรียมไว้ได้เลย").waitFor();
+  await page.getByText("รอพิธีกรเปิดโหวต").waitFor();
   await sleep(900);
   await page.screenshot({ path: `${OUT}/stage-pending.jpg`, quality: 82 });
 
