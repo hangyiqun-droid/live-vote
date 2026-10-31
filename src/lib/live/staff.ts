@@ -4,7 +4,15 @@
 // presence plugin and the tally channel never ship in the phone vote page bundle.
 import type { ConnectionStateChange, InboundMessage, TokenParams } from "ably";
 import { withBase } from "@/lib/base-path";
-import { CHANNEL_EVENT, CHANNEL_TALLY, type EventState, type TallySnapshot } from "@/lib/types";
+import {
+  CHANNEL_EVENT,
+  CHANNEL_LOBBY,
+  CHANNEL_TALLY,
+  type EventState,
+  type GreetingBatch,
+  type ScanCount,
+  type TallySnapshot,
+} from "@/lib/types";
 import { mapState, type LiveStatus } from "./index";
 
 export type { LiveStatus } from "./index";
@@ -13,6 +21,9 @@ export interface StaffFeed {
   onEvent(cb: (s: EventState) => void): void;
   onTally(cb: (s: TallySnapshot) => void): void;
   onStatus(cb: (s: LiveStatus) => void): void;
+  /** Lobby counter and greetings (stage only, fix9) */
+  onCount(cb: (c: ScanCount) => void): void;
+  onGreeting(cb: (b: GreetingBatch) => void): void;
   /** Number of stage screens connected right now (admin only) */
   onScreens(cb: (n: number) => void): void;
   close(): void;
@@ -26,6 +37,8 @@ export function createStaffFeed(opts: Options): StaffFeed {
   const tallyCbs: ((s: TallySnapshot) => void)[] = [];
   const statusCbs: ((s: LiveStatus) => void)[] = [];
   const screenCbs: ((n: number) => void)[] = [];
+  const countCbs: ((c: ScanCount) => void)[] = [];
+  const greetCbs: ((b: GreetingBatch) => void)[] = [];
 
   let closed = false;
   let close = () => {};
@@ -64,6 +77,13 @@ export function createStaffFeed(opts: Options): StaffFeed {
       .catch(() => undefined);
 
     if (opts.role === "stage") {
+      const lobby = client.channels.get(CHANNEL_LOBBY);
+      void lobby
+        .subscribe("count", (m: InboundMessage) => countCbs.forEach((cb) => cb(m.data as ScanCount)))
+        .catch(() => undefined);
+      void lobby
+        .subscribe("greet", (m: InboundMessage) => greetCbs.forEach((cb) => cb(m.data as GreetingBatch)))
+        .catch(() => undefined);
       // Ably re-enters presence by itself after a reconnect
       void tally.presence.enter({ screen: "stage" }).catch(() => undefined);
     } else {
@@ -85,6 +105,8 @@ export function createStaffFeed(opts: Options): StaffFeed {
     onTally: (cb) => void tallyCbs.push(cb),
     onStatus: (cb) => void statusCbs.push(cb),
     onScreens: (cb) => void screenCbs.push(cb),
+    onCount: (cb) => void countCbs.push(cb),
+    onGreeting: (cb) => void greetCbs.push(cb),
     close: () => {
       closed = true;
       close();

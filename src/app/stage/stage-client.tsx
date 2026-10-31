@@ -6,10 +6,11 @@ import { nominees } from "@/data/nominees";
 import { photoSrc } from "@/components/photo";
 import { withBase } from "@/lib/base-path";
 import { createStaffFeed, type LiveStatus } from "@/lib/live/staff";
-import type { EventState, TallySnapshot } from "@/lib/types";
+import type { EventState, ScanCount, TallySnapshot } from "@/lib/types";
 import { fetchWithTimeout } from "@/lib/uuid";
 import { Canvas } from "./canvas";
 import { cue, type MusicKey } from "./cues";
+import { pushGreetings } from "./greeting-store";
 import { CountdownCues, OpenIntro } from "./moments";
 import { RaceView } from "./race-view";
 import { Hall, Reveal } from "./reveal";
@@ -73,6 +74,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
   const [live, setLive] = useState<LiveStatus>("connecting");
   const [lost, setLost] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
+  const [scans, setScans] = useState<ScanCount | null>(null);
   const [photos, setPhotos] = useState(0);
   const [seenState, setSeenState] = useState<EventState | null>(null);
   const [moments, setMoments] = useState<Moments>({ open: null, reveal: null, close: null });
@@ -83,6 +85,12 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
   const applyState = useCallback((next: EventState) => {
     setState((prev) => (prev && next.version < prev.version ? prev : next));
     setClockOffset(Date.parse(next.server_now) - Date.now());
+  }, []);
+
+  // Lobby counter: Postgres' clock orders the readings, so a late message never rolls it back (fix9)
+  const applyScans = useCallback((c: ScanCount) => {
+    if (typeof c?.count !== "number" || typeof c?.at !== "number") return;
+    setScans((prev) => (!prev || c.at >= prev.at ? c : prev));
   }, []);
 
   // Keep only the newest snapshot per award — publishes can arrive out of order (SPEC 1.1 #4)
@@ -114,8 +122,14 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
         return;
       }
       if (!res.ok) throw new Error(String(res.status));
-      const j = (await res.json()) as { state: EventState; tally: TallySnapshot | null; hall?: TallySnapshot[] };
+      const j = (await res.json()) as {
+        state: EventState;
+        tally: TallySnapshot | null;
+        hall?: TallySnapshot[];
+        scans?: ScanCount;
+      };
       applyState(j.state);
+      if (j.scans) applyScans(j.scans);
       if (j.tally) applyTally(j.tally);
       j.hall?.forEach(applyTally);
       setPhase("ready");
@@ -123,7 +137,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
     } catch {
       setSyncFailed(true);
     }
-  }, [applyState, applyTally]);
+  }, [applyState, applyTally, applyScans]);
 
   // Preload + decode all 29 faces before the first scene (SPEC 5.5)
   useEffect(() => {
@@ -151,12 +165,14 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
     feed.onEvent(applyState);
     feed.onTally(applyTally);
     feed.onStatus(setLive);
+    feed.onCount(applyScans);
+    feed.onGreeting((b) => pushGreetings(b?.items));
     const t = setInterval(() => void resync(), RESYNC_MS);
     return () => {
       clearInterval(t);
       feed.close();
     };
-  }, [applyState, applyTally, resync]);
+  }, [applyState, applyTally, applyScans, resync]);
 
   // Every (re)connect pulls the whole snapshot; a long outage turns the banner orange
   useEffect(() => {
@@ -237,7 +253,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
       {state.show_hall ? (
         <Hall awards={state.awards} tallies={tallies} />
       ) : !award ? (
-        <Lobby title={state.title} link={link} />
+        <Lobby title={state.title} link={link} scans={scans?.count ?? null} greetingsOn={state.greetings_on} />
       ) : award.status === "pending" ? (
         <Pending award={award} eventTitle={link.eventTitle} />
       ) : (

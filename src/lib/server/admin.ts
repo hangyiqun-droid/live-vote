@@ -3,6 +3,7 @@ import { callFn } from "@/db/client";
 import { EXTEND_SECONDS, TIMER_CHOICES, type AdminAction } from "@/lib/admin-actions";
 import type { AdminOverview, EventState } from "@/lib/types";
 import { publishEvent, publishTally } from "./ably";
+import { resetScans } from "./lobby";
 import { readEventState, readSnapshot } from "./state";
 
 // Every MC button (SPEC 4.3). Each one maps to a single Postgres function that checks the
@@ -21,7 +22,8 @@ export function parseAction(b: Record<string, unknown>): AdminAction | null {
       return { action: "lobby" };
     case "hide":
     case "hall":
-    case "qr_fallback": {
+    case "qr_fallback":
+    case "greetings": {
       const on = bool(b.on);
       return on === null ? null : { action: b.action, on };
     }
@@ -30,6 +32,8 @@ export function parseAction(b: Record<string, unknown>): AdminAction | null {
       if (!award_id || !(TIMER_CHOICES as readonly number[]).includes(seconds)) return null;
       return { action: "open", award_id, seconds };
     }
+    case "reset_scans":
+      return { action: "reset_scans" };
     case "reset": {
       const confirm = str(b.confirm);
       return award_id && confirm !== null ? { action: "reset", award_id, confirm } : null;
@@ -83,6 +87,11 @@ async function run(a: AdminAction): Promise<FnResult> {
       return callFn("set_show_hall", [a.on]);
     case "qr_fallback":
       return callFn("set_qr_fallback", [a.on]);
+    case "greetings":
+      return callFn("set_greetings", [a.on]);
+    case "reset_scans":
+      await resetScans(); // clears the table and tells the stage straight away
+      return { ok: true };
     case "rename":
       return callFn("set_award_title", [a.award_id, a.title, a.subtitle]);
   }

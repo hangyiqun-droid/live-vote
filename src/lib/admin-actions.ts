@@ -15,4 +15,6 @@ export type AdminAction =
   | { action: "hide"; on: boolean }
   | { action: "hall"; on: boolean }
   | { action: "qr_fallback"; on: boolean }
+  | { action: "greetings"; on: boolean }
+  | { action: "reset_scans" }
   | { action: "rename"; award_id: number; title: string; subtitle: string };
