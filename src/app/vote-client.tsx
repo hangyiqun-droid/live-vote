@@ -17,6 +17,8 @@ import { withBase } from "@/lib/base-path";
 import { createLiveFeed, type LiveFeed, type LiveStatus } from "@/lib/live";
 import type { AwardState, EventState } from "@/lib/types";
 import { fetchWithTimeout, uuid4 } from "@/lib/uuid";
+import { GreetingBox } from "./greeting-box";
+import { registerScan } from "./scan";
 import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from "./vote-store";
 
 // 29 faces fit one screen (SPEC 4.2). Tiles are ~1/5 of the width, but on a tall phone cover-fit
@@ -87,8 +89,10 @@ export function VoteClient() {
         const j = (await r.json()) as { device_id: string };
         saveDeviceId(j.device_id);
         setDeviceId(j.device_id);
+        void registerScan(j.device_id); // lobby counter (fix9)
       } catch {
         setDeviceId(local);
+        if (local) void registerScan(local);
       }
     })();
     const f = createLiveFeed();
@@ -271,6 +275,9 @@ export function VoteClient() {
       {voting && <Grid selected={pick} onChoose={choose} />}
 
       {s && !activeAward && <Waiting state={s} />}
+
+      {/* Greetings only while the stage shows the lobby and the MC switch is on (fix9) */}
+      {s && !activeAward && s.current_award_id === null && !s.show_hall && s.greetings_on && <GreetingBox />}
 
       {activeAward && voting && pick !== null && (
         <ConfirmSheet

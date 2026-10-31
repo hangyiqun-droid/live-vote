@@ -5,6 +5,7 @@ import {
   ArrowPathIcon,
   ArrowRightStartOnRectangleIcon,
   ArrowUturnLeftIcon,
+  ChatBubbleLeftRightIcon,
   CheckIcon,
   ClipboardDocumentIcon,
   ExclamationTriangleIcon,
@@ -14,6 +15,7 @@ import {
   SignalSlashIcon,
   TrophyIcon,
   TvIcon,
+  UsersIcon,
 } from "@heroicons/react/24/solid";
 import type { AdminAction } from "@/lib/admin-actions";
 import { withBase } from "@/lib/base-path";
@@ -21,6 +23,7 @@ import { createStaffFeed, type LiveStatus } from "@/lib/live/staff";
 import type { AdminOverview, AdminTally, EventState, TallySnapshot } from "@/lib/types";
 import { fetchWithTimeout } from "@/lib/uuid";
 import { AwardCard } from "./award-card";
+import { HoldButton } from "./hold-button";
 import { Login } from "./login";
 import { actionError } from "./messages";
 import a from "./admin.module.css";
@@ -28,18 +31,20 @@ import a from "./admin.module.css";
 const POLL_MS = 10_000;
 
 type Phase = "checking" | "login" | "ready" | "down";
-type Overview = { state: EventState; tallies: Record<number, AdminTally>; stagePath: string | null };
+type Overview = { state: EventState; tallies: Record<number, AdminTally>; stagePath: string | null; scans: number | null };
+type Raw = AdminOverview & { stage_path?: string | null; scans?: number };
 type Failure = { message: string; retry: { act: AdminAction; label: string } | null };
 type Undo = { label: string; act: AdminAction; undoLabel: string };
 
 const newer = (t: TallySnapshot, have: TallySnapshot | undefined) =>
   !have || t.round > have.round || (t.round === have.round && t.seq > have.seq);
 
-function toOverview(j: AdminOverview & { stage_path?: string | null }, prevStage: string | null): Overview {
+function toOverview(j: Raw, prevStage: string | null, prevScans: number | null): Overview {
   return {
     state: j.state,
     tallies: Object.fromEntries(j.tallies.map((t) => [t.award_id, t])),
     stagePath: j.stage_path ?? prevStage,
+    scans: j.scans ?? prevScans,
   };
 }
 
@@ -63,6 +68,7 @@ function inverse(act: AdminAction, before: EventState): AdminAction | null {
     case "hide":
     case "hall":
     case "qr_fallback":
+    case "greetings":
       return { action: act.action, on: !act.on };
     case "rename": {
       const old = title(act.award_id);
@@ -84,9 +90,11 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
   const [clockOffset, setClockOffset] = useState(0);
   const [copied, setCopied] = useState(false);
   const stageRef = useRef<string | null>(null);
+  const scansRef = useRef<number | null>(null);
 
-  const accept = useCallback((j: AdminOverview & { stage_path?: string | null }) => {
-    const next = toOverview(j, stageRef.current);
+  const accept = useCallback((j: Raw) => {
+    const next = toOverview(j, stageRef.current, scansRef.current);
+    scansRef.current = next.scans;
     stageRef.current = next.stagePath;
     setOv((prev) => (prev && next.state.version < prev.state.version ? { ...prev, tallies: next.tallies } : next));
     setClockOffset(Date.parse(j.state.server_now) - Date.now());
@@ -159,8 +167,8 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
           return false;
         }
         if (r.status !== 200 && r.status !== 409) throw new Error(String(r.status));
-        const j = (await r.json()) as { ok: boolean; error?: string; overview: AdminOverview };
-        accept(j.overview);
+        const j = (await r.json()) as { ok: boolean; error?: string; overview: AdminOverview; scans?: number };
+        accept({ ...j.overview, scans: j.scans });
         if (!j.ok) {
           setFailure({ message: actionError(j.error), retry: null });
           return false;
@@ -299,6 +307,34 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
             QR สำรองบนจอ
             <span className={a.knob} aria-hidden />
           </button>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={state.greetings_on}
+            className={state.greetings_on ? `${a.switch} ${a.switchOn}` : a.switch}
+            disabled={busy !== null}
+            onClick={() =>
+              void send({ action: "greetings", on: !state.greetings_on }, state.greetings_on ? "ปิดข้อความขึ้นจอ" : "เปิดข้อความขึ้นจอ")
+            }
+          >
+            <ChatBubbleLeftRightIcon aria-hidden />
+            ข้อความทักทายขึ้นจอ
+            <span className={a.knob} aria-hidden />
+          </button>
+        </div>
+        <div className={a.statusRow}>
+          <span className={a.pill} role="status" data-scans={ov.scans ?? ""}>
+            <UsersIcon aria-hidden />
+            {ov.scans === null ? "กำลังนับคนสแกน…" : `สแกนแล้ว ${ov.scans.toLocaleString("th-TH")} คน`}
+          </span>
+          <HoldButton
+            tone="danger"
+            hint="กดค้าง 1.5 วิ (ใช้หลังซ้อม)"
+            disabled={busy !== null}
+            onConfirm={() => void send({ action: "reset_scans" }, "ล้างตัวเลขคนสแกน")}
+          >
+            ล้างตัวเลขคนสแกน
+          </HoldButton>
         </div>
         {!hasFallback && (
           <p id="fallback-note" className={a.note}>
