@@ -2,9 +2,10 @@
 // public/audio/CREDITS.md): trims each source, evens out loudness, joins every effect into one
 // sprite, and turns the two music beds into seamless loops. Writes .webm (Opus) + .mp3 and the
 // sprite map src/app/stage/sound/sprite.ts.
-// Usage: pnpm audio <folder with the source files named as in RECIPE>  (needs ffmpeg)
+// Usage: pnpm audio <folder with the source files named as in RECIPE / BGM>  (needs ffmpeg)
+//        pnpm audio <folder> --bgm-only   rebuild just the two music beds (sfx.* and the SPRITE map stay as they are)
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -35,10 +36,15 @@ const RECIPE: Sfx[] = [
   { key: "sfx_applause", parts: [{ file: "fs_221567.mp3", start: 0.3, dur: 6.0 }], fadeIn: 0.3, fadeOut: 1.8, level: -20 },
 ];
 
-// Music beds: loudness-normalised quieter than effects, loop seam hidden by a crossfade
-const BGM = [
-  { key: "bgm_lobby", file: "fs_704972.mp3", lufs: -21, xfade: 2 },
-  { key: "bgm_voting", file: "fs_512340.mp3", lufs: -21, xfade: 2 },
+// Music beds: loudness-matched to one static gain (a moving gain would jump at the loop point).
+// loop "native": the source is already a whole number of bars cut on the beat (beats × 60 / bpm = length), so it
+// repeats as it is. loop "xfade": the seam is hidden by a crossfade of `xfade` seconds (use a whole number of beats).
+type Bgm = { key: string; file: string; lufs: number; loop: "native" | "xfade"; xfade?: number };
+const BGM: Bgm[] = [
+  // Sunny City, 120 bpm, 160 beats = 80.000 s
+  { key: "bgm_lobby", file: "og_sunny_city_bpm120.mp3", lufs: -22, loop: "native" },
+  // Trance Boss Battle, 150 bpm, 256 beats = 102.400 s
+  { key: "bgm_voting", file: "og_trance_boss_battle_bpm150.mp3", lufs: -21, loop: "native" },
 ];
 
 const GAP = 0.4; // silence between sprite entries so a slightly late stop never bleeds
@@ -56,14 +62,29 @@ function levels(file: string) {
   return { mean, max };
 }
 
-function encode(wav: string, outBase: string) {
-  ff(["-i", wav, "-c:a", "libopus", "-b:a", "96k", "-vbr", "on", `${outBase}.webm`]);
-  ff(["-i", wav, "-c:a", "libmp3lame", "-q:a", "4", `${outBase}.mp3`]);
+function encode(wav: string, outBase: string, music = false) {
+  ff(["-i", wav, "-c:a", "libopus", "-b:a", music ? "80k" : "96k", "-vbr", "on", `${outBase}.webm`]);
+  ff(["-i", wav, "-c:a", "libmp3lame", "-q:a", music ? "6" : "4", `${outBase}.mp3`]);
+}
+
+// integrated loudness (LUFS) of a file, from ebur128's summary
+function lufs(file: string) {
+  const log = execFileSync("sh", ["-c", 'ffmpeg -hide_banner -nostats -i "$1" -af ebur128 -f null - 2>&1', "sh", file]).toString();
+  return Number(/I:\s+(-?[\d.]+) LUFS/.exec(log.slice(log.lastIndexOf("Summary")))?.[1]);
+}
+
+// sprite map of the current sfx.* (kept as it is when only the music is rebuilt)
+function existingSprite(root: string) {
+  const text = readFileSync(join(root, "src/app/stage/sound/sprite.ts"), "utf8");
+  const sprite: Record<string, [number, number]> = {};
+  for (const m of text.matchAll(/(sfx_\w+): \[(\d+), (\d+)\]/g)) sprite[m[1]] = [Number(m[2]), Number(m[3])];
+  return sprite;
 }
 
 function main() {
   const srcDir = process.argv[2];
-  if (!srcDir) throw new Error("usage: pnpm audio <source folder>");
+  if (!srcDir) throw new Error("usage: pnpm audio <source folder> [--bgm-only]");
+  const bgmOnly = process.argv.includes("--bgm-only");
   const src = (f: string) => resolve(srcDir, f);
   const root = resolve(__dirname, "..");
   const outDir = join(root, "public/audio");
@@ -72,10 +93,10 @@ function main() {
 
   try {
     // 1) each effect → its own normalised stereo WAV
-    const sprite: Record<string, [number, number]> = {};
+    const sprite: Record<string, [number, number]> = bgmOnly ? existingSprite(root) : {};
     const pieces: string[] = [];
     let cursor = 0;
-    for (const s of RECIPE) {
+    for (const s of bgmOnly ? [] : RECIPE) {
       const raw = join(tmp, `${s.key}.raw.wav`);
       const inputs = s.parts.flatMap((p) => ["-i", src(p.file)]);
       const chains = s.parts.map((p, i) => {
@@ -108,32 +129,44 @@ function main() {
     }
 
     // 2) join with silence → one sprite file
-    const silence = join(tmp, "gap.wav");
-    ff(["-f", "lavfi", "-i", `anullsrc=r=${RATE}:cl=stereo`, "-t", String(GAP), silence]);
-    const list = join(tmp, "list.txt");
-    writeFileSync(list, pieces.flatMap((p) => [`file '${p}'`, `file '${silence}'`]).join("\n"));
-    const spriteWav = join(tmp, "sfx.wav");
-    ff(["-f", "concat", "-safe", "0", "-i", list, "-c", "pcm_s16le", spriteWav]);
-    encode(spriteWav, join(outDir, "sfx"));
+    if (!bgmOnly) {
+      const silence = join(tmp, "gap.wav");
+      ff(["-f", "lavfi", "-i", `anullsrc=r=${RATE}:cl=stereo`, "-t", String(GAP), silence]);
+      const list = join(tmp, "list.txt");
+      writeFileSync(list, pieces.flatMap((p) => [`file '${p}'`, `file '${silence}'`]).join("\n"));
+      const spriteWav = join(tmp, "sfx.wav");
+      ff(["-f", "concat", "-safe", "0", "-i", list, "-c", "pcm_s16le", spriteWav]);
+      encode(spriteWav, join(outDir, "sfx"));
+    }
 
-    // 3) music beds: y = x[0, L-d) with x[L-d, L) faded out over a faded-in head → seamless loop
+    // 3) music beds: one static gain to the target loudness, then made into a seamless loop
     const bgm: Record<string, number> = {};
     for (const b of BGM) {
-      const len = probe(src(b.file));
-      const d = b.xfade;
+      const input = src(b.file);
+      const len = probe(input);
       const wav = join(tmp, `${b.key}.wav`);
-      const graph = [
-        `[0:a]aresample=${RATE},aformat=channel_layouts=stereo,asplit=3[a][b][c]`,
-        `[a]atrim=0:${d},asetpts=PTS-STARTPTS,afade=t=in:d=${d}:curve=qsin[head]`,
-        `[b]atrim=${len - d}:${len},asetpts=PTS-STARTPTS,afade=t=out:d=${d}:curve=qsin[tail]`,
-        `[head][tail]amix=inputs=2:normalize=0[seam]`,
-        `[c]atrim=${d}:${len - d},asetpts=PTS-STARTPTS[body]`,
-        `[seam][body]concat=n=2:v=0:a=1,loudnorm=I=${b.lufs}:TP=-2:LRA=11,aresample=${RATE}[out]`,
-      ].join(";");
-      ff(["-i", src(b.file), "-filter_complex", graph, "-map", "[out]", wav]);
-      encode(wav, join(outDir, b.key.replace("_", "-")));
-      bgm[b.key] = Math.round(probe(wav) * 1000);
-      console.log(`${b.key.padEnd(14)} ${(bgm[b.key] / 1000).toFixed(1)} s loop`);
+      const base = [`aresample=${RATE}`, "aformat=channel_layouts=stereo"];
+      if (b.loop === "native") {
+        ff(["-i", input, "-af", base.join(","), wav]);
+      } else {
+        // y = x[0, L-d) with x[L-d, L) faded out over a faded-in head
+        const d = b.xfade ?? 2;
+        const graph = [
+          `[0:a]${base.join(",")},asplit=3[a][b][c]`,
+          `[a]atrim=0:${d},asetpts=PTS-STARTPTS,afade=t=in:d=${d}:curve=qsin[head]`,
+          `[b]atrim=${len - d}:${len},asetpts=PTS-STARTPTS,afade=t=out:d=${d}:curve=qsin[tail]`,
+          `[head][tail]amix=inputs=2:normalize=0[seam]`,
+          `[c]atrim=${d}:${len - d},asetpts=PTS-STARTPTS[body]`,
+          `[seam][body]concat=n=2:v=0:a=1[out]`,
+        ].join(";");
+        ff(["-i", input, "-filter_complex", graph, "-map", "[out]", wav]);
+      }
+      const gain = Math.min(b.lufs - lufs(wav), -2 - levels(wav).max);
+      const done = join(tmp, `${b.key}.lev.wav`);
+      ff(["-i", wav, "-af", `volume=${gain.toFixed(2)}dB`, "-ar", String(RATE), done]);
+      encode(done, join(outDir, b.key.replace("_", "-")), true);
+      bgm[b.key] = Math.round(probe(done) * 1000);
+      console.log(`${b.key.padEnd(14)} ${(bgm[b.key] / 1000).toFixed(1)} s loop  gain ${gain.toFixed(1)} dB`);
     }
 
     const ts = `// Generated by scripts/make-audio.ts — do not edit by hand. [start ms, duration ms] in sfx.webm/.mp3

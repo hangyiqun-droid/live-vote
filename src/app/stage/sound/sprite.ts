@@ -18,6 +18,6 @@ export type SfxKey = keyof typeof SPRITE;
 
 // Loop length of each music bed (ms)
 export const BGM_MS = {
-  bgm_lobby: 40857,
-  bgm_voting: 55640,
+  bgm_lobby: 80000,
+  bgm_voting: 102400,
 } as const;
