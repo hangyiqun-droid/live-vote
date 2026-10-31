@@ -51,9 +51,10 @@ export const CHANNEL_EVENT = "event:event";
 export const CHANNEL_TALLY = "event:tally";
 
 // event:lobby — stage only (fix9). Not the vote channel, so a rush of greetings or scans can never
-// eat the tally channel's 50 msg/s. `at` is Postgres' clock in ms: the stage ignores older counts.
+// eat the tally channel's 50 msg/s. `rev` is the committed revision the count belongs to (lobby_stats.scan_rev):
+// the stage keeps the highest one, so the screen always ends on the number the database holds.
 export const CHANNEL_LOBBY = "event:lobby";
-export type ScanCount = { count: number; at: number };
+export type ScanCount = { count: number; rev: number };
 export type Greeting = { id: string; text: string };
 // One Ably message carries a whole batch of greetings
 export type GreetingBatch = { items: Greeting[] };
@@ -61,3 +62,4 @@ export type GreetingBatch = { items: Greeting[] };
 // Greeting limits, shared by the phone box and the server check (the server is the one that counts)
 export const GREETING_MAX_CHARS = 60;
 export const GREETING_GAP_SECONDS = 10;
+export const GREETING_MAX_PER_SECOND = 3; // app-wide, enforced in Postgres (greeting_gate)

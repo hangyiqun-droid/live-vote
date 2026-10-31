@@ -14,30 +14,28 @@ export type Cleaned =
 
 const chars = (s: string) => Array.from(s);
 
-// Control characters, zero-width and bidi tricks: they cannot be read, only used to dodge the filter
-// or to flip the text around. Tab/newline become spaces first.
+// Characters nobody can read: only used to dodge the filter or to flip the text around. Everything
+// Unicode files under "other" (controls Cc, format Cf — zero-width, bidi, the U+E0000 tag block, BOM —,
+// private use, surrogates, unassigned) plus the few invisible fillers/selectors that are filed as
+// letters or marks. Written as code-point ranges, never as literal characters in this file.
+const OTHER = /[\p{Cc}\p{Cf}\p{Co}\p{Cs}\p{Cn}]/gu;
 const INVISIBLE_RANGES: readonly (readonly [number, number])[] = [
-  [0x0000, 0x001f], // C0 controls
-  [0x007f, 0x009f], // DEL + C1 controls
-  [0x00ad, 0x00ad], // soft hyphen
-  [0x034f, 0x034f],
-  [0x061c, 0x061c],
-  [0x115f, 0x1160],
-  [0x17b4, 0x17b5],
-  [0x180b, 0x180f],
-  [0x200b, 0x200f], // zero-width space/joiners, direction marks
-  [0x2028, 0x202f], // line/paragraph separators, bidi embeddings
+  [0x034f, 0x034f], // combining grapheme joiner
+  [0x115f, 0x1160], // Hangul fillers
+  [0x17b4, 0x17b5], // Khmer inherent vowels
+  [0x180b, 0x180f], // Mongolian free variation selectors
+  [0x2028, 0x202f], // line/paragraph separators, bidi embeddings, narrow no-break space
   [0x205f, 0x206f],
-  [0x3164, 0x3164],
+  [0x3164, 0x3164], // Hangul filler
   [0xfe00, 0xfe0f], // variation selectors
-  [0xfeff, 0xfeff], // BOM / zero-width no-break space
-  [0xfff9, 0xfffc],
+  [0xffa0, 0xffa0], // halfwidth Hangul filler
+  [0xe0100, 0xe01ef], // variation selectors supplement
 ];
 const isInvisible = (c: string) => {
   const cp = c.codePointAt(0)!;
   return INVISIBLE_RANGES.some(([a, b]) => cp >= a && cp <= b);
 };
-const removeInvisible = (s: string) => chars(s).filter((c) => !isInvisible(c)).join("");
+const removeInvisible = (s: string) => chars(s.replace(OTHER, "")).filter((c) => !isInvisible(c)).join("");
 const MARK = /\p{M}/u;
 
 function limitMarks(s: string): string {
@@ -59,58 +57,89 @@ export function sanitize(raw: string): string {
   // Every kind of whitespace (tab, newline, U+2028…) becomes a plain space before the invisible
   // characters are dropped, so words never glue together
   const spaced = raw.normalize("NFC").replace(/\s/g, " ");
-  const cleaned = removeInvisible(stripHtml(spaced)).replace(/ +/g, " ").trim();
+  const cleaned = stripHtml(removeInvisible(spaced)).replace(/ +/g, " ").trim();
   return limitMarks(cleaned);
 }
 
-// Look-alike symbols people use to slip past a filter
-const LOOKALIKE: Record<string, string> = { "0": "o", "1": "i", "3": "e", "4": "a", "5": "s", "7": "t", "@": "a", $: "s", "!": "i" };
+// ---- the swear-word filter ----
+// It compares a *folded copy* of the text; what is shown is the sanitised text above, untouched.
+// This is a best-effort filter, not a guarantee: people are inventive, Thai has no spaces between
+// words, and a list can only hold what someone thought of. The MC switch is the real safety net.
 
-function squeeze(s: string): string {
-  // "fuuuuck" → "fuck", "เหี้ยยยย" → "เหี้ย" — runs of the same character become one
-  return s.replace(/(.)\1+/gu, "$1");
+// Letters that look like Latin ones (Cyrillic/Greek) — the usual way to slip "fuck" past a list
+const LOOKALIKE_LETTERS: Record<string, string> = {
+  а: "a", в: "b", е: "e", к: "k", м: "m", н: "h", о: "o", р: "p", с: "c", т: "t", у: "y", х: "x", і: "i", ї: "i", ј: "j", ѕ: "s",
+  α: "a", β: "b", ε: "e", ι: "i", κ: "k", ν: "v", ο: "o", ρ: "p", τ: "t", υ: "u", χ: "x",
+};
+const THAI_DIGITS = "๐๑๒๓๔๕๖๗๘๙";
+
+// NFKC (full-width, ligatures, styled letters), lower case, accents off Latin letters, look-alike
+// letters mapped, Thai digits to ASCII
+function fold(raw: string): string {
+  let out = "";
+  let prevLatin = false;
+  for (const ch of chars(raw.normalize("NFKC"))) {
+    if (/\p{Script=Latin}/u.test(ch)) {
+      out += ch.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+      prevLatin = true;
+      continue;
+    }
+    if (MARK.test(ch) && prevLatin) continue; // a stray accent after a Latin letter
+    prevLatin = false;
+    const lower = ch.toLowerCase();
+    const digit = THAI_DIGITS.indexOf(ch);
+    out += digit >= 0 ? String(digit) : (LOOKALIKE_LETTERS[lower] ?? lower);
+  }
+  return out;
 }
 
-// Every spelling the filter compares against: lower case, no marks-free tricks, no spaces
-function compact(text: string): string {
-  return squeeze(text.toLowerCase().replace(/[\s.,_\-*'"`~|/\\()[\]{}:;?+=^%&#]/g, ""));
-}
+// Thai: also without tone marks / thanthakhat / the other U+0E47–0E4E marks ("สั้ส" = "สัส"), and
+// without anything that is not a letter or digit — the text is compared as one run, because Thai
+// has no spaces to cut words on
+const flatKey = (s: string) => fold(s).replace(/[\u0E47-\u0E4E]/g, "").replace(/[^\p{L}\p{N}\p{M}]/gu, "");
 
-const THAI_WORDS = THAI_SUBSTRING.map(compact);
+// Every character may be repeated: "เหี้ยยยย", "fuuuck". Written as a pattern so "ass" never turns
+// into "as" (squeezing both sides would block the ordinary word)
+const repeated = (key: string) => chars(key).map((c) => `${c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}+`).join("");
+const THAI_SUBSTRING_RE = THAI_SUBSTRING.map((w) => new RegExp(repeated(flatKey(w))));
+const THAI_WHOLE_RE = new RegExp(`^(?:${THAI_WHOLE_WORD.map((w) => repeated(flatKey(w))).join("|")})$`);
+
+// English letters and what people write instead: f@ck, sh!t, a$$, b1tch, f*ck
+const CLASS: Record<string, string> = {
+  a: "[a4@*]", e: "[e3*]", i: "[i1!|*]", o: "[o0*]", u: "[uv@*]", s: "[s5$]", t: "[t7+]", l: "[l1|]", b: "[b8]", g: "[g9]",
+};
+const englishRe = (w: string) => new RegExp(`^${chars(w).map((c) => `${CLASS[c] ?? c}+`).join("")}$`);
+const ENGLISH_RE = ENGLISH_WORDS.map(englishRe);
+const matchesEnglish = (token: string) => {
+  const t = token.replace(/[._\-'`~/\\]/g, "").replace(/^[!?,;:"()[\]{}]+|[!?,;:"()[\]{}]+$/g, "");
+  return t.length > 0 && ENGLISH_RE.some((re) => re.test(t));
+};
 
 // Links and phone numbers do not belong on a projector wall
 const LINK = /(https?:|www\.|[a-z0-9-]+\.(com|net|org|co|th|io|me|link)\b|line\.me|@[a-z0-9_.]{3,})/i;
 const LONG_NUMBER = /(\d[\s-]?){9,}/;
 
 export function isBlocked(text: string): boolean {
-  if (LINK.test(text) || LONG_NUMBER.test(text)) return true;
+  const folded = fold(text);
+  if (LINK.test(folded) || LONG_NUMBER.test(folded)) return true;
 
-  const lower = text.toLowerCase();
-  const flat = compact(lower);
-  if (THAI_WORDS.some((w) => flat.includes(w))) return true;
+  // Thai (and anything else written without spaces): rude words anywhere inside the run …
+  const flat = flatKey(text);
+  if (THAI_SUBSTRING_RE.some((re) => re.test(flat))) return true;
+  // … short ones only as a whole word, so "เชี่ยวชาญ" or "สาดน้ำ" stay fine
+  const tokens = folded.split(/\s+/).filter(Boolean);
+  if (tokens.some((t) => THAI_WHOLE_RE.test(flatKey(t)))) return true;
 
-  // Whole words, split on anything that is not a letter, so "ห่า" alone is caught but "ห่างไกล" is not
-  const words = lower
-    .split(/[^\p{L}\p{M}\p{N}]+/u)
-    .filter(Boolean);
-  const wholeThai = new Set(THAI_WHOLE_WORD.map(compact));
-  const english = new Set(ENGLISH_WORDS.map(compact));
-  for (const w of words) {
-    const c = squeeze(w);
-    if (wholeThai.has(c) || english.has(c)) return true;
-    const mapped = squeeze(w.replace(/[0-9@$!]/g, (ch) => LOOKALIKE[ch] ?? ch));
-    if (mapped !== c && english.has(mapped)) return true;
-  }
-  // "f u c k" / "s.h.i.t": a run of single letters reads as one word. Only runs, so a Latin name such
-  // as "Pornchai" (a common Thai name) is never cut open and searched for a rude word inside.
-  let run = "";
-  for (const w of [...words, ""]) {
-    if (chars(w).length === 1) {
-      run += w;
-      continue;
+  // English: whole words, written plainly or dressed up, then runs of short pieces read as one word
+  // ("f u c k", "fu ck", "sh it") — only pieces of up to 3 characters, so ordinary names never merge
+  if (tokens.some(matchesEnglish)) return true;
+  for (let i = 0; i < tokens.length; i++) {
+    let joined = "";
+    for (let j = i; j < Math.min(tokens.length, i + 6); j++) {
+      if (chars(tokens[j]).length > 3) break;
+      joined += tokens[j];
+      if (j > i && matchesEnglish(joined)) return true;
     }
-    if (run.length >= 3 && english.has(squeeze(run.replace(/[0-9@$!]/g, (ch) => LOOKALIKE[ch] ?? ch)))) return true;
-    run = "";
   }
   return false;
 }

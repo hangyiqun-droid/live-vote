@@ -1,5 +1,5 @@
 {
-  "id": "467d7a65-13bf-40cd-a474-acdac2081862",
+  "id": "47521927-0d1a-4816-aca1-b64a4d2acac2",
   "prevId": "4f064210-a1a8-4d39-8976-e64d5676cae1",
   "version": "7",
   "dialect": "postgresql",
@@ -281,6 +281,64 @@
         "events_singleton": {
           "name": "events_singleton",
           "value": "\"events\".\"id\" = 1"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.greeting_requests": {
+      "name": "greeting_requests",
+      "schema": "",
+      "columns": {
+        "request_hash": {
+          "name": "request_hash",
+          "type": "bytea",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "at": {
+          "name": "at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.lobby_stats": {
+      "name": "lobby_stats",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "smallint",
+          "primaryKey": true,
+          "notNull": true,
+          "default": 1
+        },
+        "scan_rev": {
+          "name": "scan_rev",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "lobby_stats_singleton": {
+          "name": "lobby_stats_singleton",
+          "value": "\"lobby_stats\".\"id\" = 1"
         }
       },
       "isRLSEnabled": false

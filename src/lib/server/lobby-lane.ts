@@ -13,12 +13,16 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 export type GreetingLaneOptions = {
   gapMs: number; // spacing between two messages from this instance
   maxBatch: number; // greetings per message
-  maxQueue: number; // waiting greetings; beyond this the route says "busy" before taking a slot
+  maxQueue: number; // waiting greetings; beyond this enqueue() answers "busy" at once
+  // Asked right before a batch goes out. false = the MC switched greetings off (or the stage left the
+  // lobby) after these passed the gate: the batch is dropped, never shown.
+  stillOpen?: () => Promise<boolean>;
 };
 
 export const DEFAULT_GREETING_LANE: GreetingLaneOptions = { gapMs: 300, maxBatch: 6, maxQueue: 24 };
 
-type Waiting = { greeting: Greeting; done: (ok: boolean) => void };
+export type GreetingOutcome = "sent" | "failed" | "closed" | "busy";
+type Waiting = { greeting: Greeting; done: (o: GreetingOutcome) => void };
 
 export function createGreetingLane(send: (b: GreetingBatch) => Promise<boolean>, opts: GreetingLaneOptions = DEFAULT_GREETING_LANE) {
   const queue: Waiting[] = [];
@@ -37,23 +41,26 @@ export function createGreetingLane(send: (b: GreetingBatch) => Promise<boolean>,
     const batch = queue.splice(0, opts.maxBatch);
     if (batch.length === 0) return;
     flushing = true;
-    let ok = false;
+    let outcome: GreetingOutcome = "failed";
     try {
-      ok = await send({ items: batch.map((w) => w.greeting) });
+      if (opts.stillOpen && !(await opts.stillOpen())) outcome = "closed";
+      else outcome = (await send({ items: batch.map((w) => w.greeting) })) ? "sent" : "failed";
     } catch {
-      ok = false;
+      outcome = "failed";
     }
     flushing = false;
     lastAt = Date.now();
-    for (const w of batch) w.done(ok);
+    for (const w of batch) w.done(outcome);
     schedule();
   }
 
   return {
-    /** Room for one more? Checked before a sender's slot is used up. */
+    /** Room for one more? A cheap early answer; enqueue() checks again, so a rush cannot overshoot. */
     canAccept: () => queue.length < opts.maxQueue,
-    /** Resolves once the message carrying this greeting was accepted by Ably (true) or not (false). */
-    enqueue(greeting: Greeting): Promise<boolean> {
+    /** Resolves once the batch carrying this greeting went to Ably ("sent"), was dropped because the
+     *  switch closed ("closed"), or could not be sent ("failed"). A full queue answers "busy" at once. */
+    enqueue(greeting: Greeting): Promise<GreetingOutcome> {
+      if (queue.length >= opts.maxQueue) return Promise.resolve("busy");
       return new Promise((done) => {
         queue.push({ greeting, done });
         schedule();
@@ -71,7 +78,7 @@ export const DEFAULT_COUNT_LANE: CountLaneOptions = { gapMs: 400, retryMs: 800, 
 export function createCountPublisher(send: (c: ScanCount) => Promise<boolean>, opts: CountLaneOptions = DEFAULT_COUNT_LANE) {
   let next: ScanCount | null = null;
   let inflight: Promise<void> | null = null;
-  let doneAt = -1; // every count with `at` ≤ this has been sent (or given up on)
+  let doneRev = -1; // every count with `rev` ≤ this has been sent (or given up on)
   let ok = true;
   let lastAt = 0;
 
@@ -91,15 +98,15 @@ export function createCountPublisher(send: (c: ScanCount) => Promise<boolean>, o
       lastAt = Date.now();
       if (sent) {
         ok = true;
-        doneAt = Math.max(doneAt, c.at);
+        doneRev = Math.max(doneRev, c.rev);
         failingSince = 0;
       } else if (Date.now() - (failingSince ||= Date.now()) < opts.giveUpMs) {
         const newer = next as ScanCount | null; // a newer count may have arrived while sending
-        if (!newer || newer.at < c.at) next = c;
+        if (!newer || newer.rev < c.rev) next = c;
         await sleep(opts.retryMs);
       } else {
         ok = false; // the stage's own 15 s resync covers this
-        doneAt = Math.max(doneAt, c.at);
+        doneRev = Math.max(doneRev, c.rev);
         failingSince = 0;
       }
     }
@@ -107,10 +114,10 @@ export function createCountPublisher(send: (c: ScanCount) => Promise<boolean>, o
   }
 
   return function publishCount(c: ScanCount): Promise<boolean> {
-    if (c.at > doneAt && (!next || c.at > next.at)) next = c;
+    if (c.rev > doneRev && (!next || c.rev > next.rev)) next = c;
     if (!inflight && next) inflight = drain();
     return (async () => {
-      while (doneAt < c.at && inflight) await inflight;
+      while (doneRev < c.rev && inflight) await inflight;
       return ok;
     })();
   };

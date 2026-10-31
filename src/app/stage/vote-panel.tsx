@@ -4,6 +4,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ClockIcon } from "@heroicons/react/24/solid";
 import type { AwardState } from "@/lib/types";
 import { Count } from "./count";
+import { qrSide } from "./qr-size";
 import { fitTitle } from "./title-fit";
 import s from "./stage.module.css";
 
@@ -14,9 +15,10 @@ export type LinkProps = {
 };
 
 export function QrCode({ qr, px, small }: { qr: LinkProps["qr"]; px: number; small?: boolean }) {
+  const side = qrSide(qr.size, px);
   return (
     <div className={small ? `${s.qrCard} ${s.qrCardSmall}` : s.qrCard}>
-      <svg width={px} height={px} viewBox={`0 0 ${qr.size} ${qr.size}`} shapeRendering="crispEdges" role="img" aria-label="QR โหวต">
+      <svg width={side} height={side} viewBox={`0 0 ${qr.size} ${qr.size}`} shapeRendering="crispEdges" role="img" aria-label="QR โหวต">
         <path d={qr.d} fill="#0b1026" />
       </svg>
     </div>

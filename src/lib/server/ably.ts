@@ -9,6 +9,7 @@ import {
   type ScanCount,
   type TallySnapshot,
 } from "@/lib/types";
+import { callFn } from "@/db/client";
 import { createCountPublisher, createGreetingLane } from "./lobby-lane";
 import { createTallyPublisher, type SendResult } from "./tally-lane";
 
@@ -106,4 +107,16 @@ const globalForLobby = globalThis as unknown as {
   eventGreetingLane?: ReturnType<typeof createGreetingLane>;
 };
 export const publishScanCount = (globalForLobby.eventPublishCount ??= createCountPublisher((c) => sendLobby("count", c)));
-export const greetingLane = (globalForLobby.eventGreetingLane ??= createGreetingLane((b: GreetingBatch) => sendLobby("greet", b)));
+export const greetingLane = (globalForLobby.eventGreetingLane ??= createGreetingLane((b: GreetingBatch) => sendLobby("greet", b), {
+  gapMs: 300,
+  maxBatch: 6,
+  maxQueue: 24,
+  // Checked again right before publishing: the MC may have switched greetings off since the gate said ok
+  stillOpen: async () => {
+    try {
+      return (await callFn<boolean>("greetings_open")) === true;
+    } catch {
+      return false; // cannot tell → show nothing
+    }
+  },
+}));

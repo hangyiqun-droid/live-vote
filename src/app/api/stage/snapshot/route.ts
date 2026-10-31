@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
       ? await Promise.all(state.awards.filter((a) => a.status === "revealed").map((a) => readSnapshot(a.id)))
       : [];
     // The lobby counter rides along: this is how the stage catches up after a drop (fix9)
-    return json({ state, tally, hall: hall.filter(Boolean), scans: await readScanCount() });
+    return json({ state, tally, hall: hall.filter(Boolean), scans: await readScanCount() }); // null = migration 0006 not applied: the stage hides the counter
   } catch (e) {
     return serverError("stage/snapshot", e);
   }

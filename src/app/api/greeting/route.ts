@@ -19,11 +19,13 @@ export async function POST(req: NextRequest) {
   } catch {
     return json({ result: "bad_request" }, 400);
   }
-  if (!isUuid(body.request_id)) return json({ result: "bad_request" }, 400);
+  if (!body || typeof body !== "object" || Array.isArray(body) || !isUuid(body.request_id)) {
+    return json({ result: "bad_request" }, 400);
+  }
 
   const device = resolveDeviceId(req, body.device_id);
   try {
-    const r = await sendGreeting(device.id, body.request_id.toLowerCase(), body.text);
+    const r = await sendGreeting(device.id, String(body.request_id).toLowerCase(), body.text);
     console.log(`[greeting] ${r.result}`);
     const res = json(r);
     if (device.fresh) setDeviceCookie(res, device.id);

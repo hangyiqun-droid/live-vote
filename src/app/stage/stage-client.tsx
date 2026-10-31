@@ -75,6 +75,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
   const [lost, setLost] = useState(false);
   const [syncFailed, setSyncFailed] = useState(false);
   const [scans, setScans] = useState<ScanCount | null>(null);
+  const [scansOff, setScansOff] = useState(false); // the database has no lobby counter (migration 0006 missing)
   const [photos, setPhotos] = useState(0);
   const [seenState, setSeenState] = useState<EventState | null>(null);
   const [moments, setMoments] = useState<Moments>({ open: null, reveal: null, close: null });
@@ -89,8 +90,9 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
 
   // Lobby counter: Postgres' clock orders the readings, so a late message never rolls it back (fix9)
   const applyScans = useCallback((c: ScanCount) => {
-    if (typeof c?.count !== "number" || typeof c?.at !== "number") return;
-    setScans((prev) => (!prev || c.at >= prev.at ? c : prev));
+    if (typeof c?.count !== "number" || typeof c?.rev !== "number") return;
+    setScans((prev) => (!prev || c.rev >= prev.rev ? c : prev));
+    setScansOff(false);
   }, []);
 
   // Keep only the newest snapshot per award — publishes can arrive out of order (SPEC 1.1 #4)
@@ -126,10 +128,11 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
         state: EventState;
         tally: TallySnapshot | null;
         hall?: TallySnapshot[];
-        scans?: ScanCount;
+        scans?: ScanCount | null;
       };
       applyState(j.state);
       if (j.scans) applyScans(j.scans);
+      else if (j.scans === null) setScansOff(true);
       if (j.tally) applyTally(j.tally);
       j.hall?.forEach(applyTally);
       setPhase("ready");
@@ -253,7 +256,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
       {state.show_hall ? (
         <Hall awards={state.awards} tallies={tallies} />
       ) : !award ? (
-        <Lobby title={state.title} link={link} scans={scans?.count ?? null} greetingsOn={state.greetings_on} />
+        <Lobby title={state.title} link={link} scans={scans?.count ?? null} greetingsOn={state.greetings_on === true} showCount={!scansOff} />
       ) : award.status === "pending" ? (
         <Pending award={award} eventTitle={link.eventTitle} />
       ) : (

@@ -14,7 +14,7 @@ describe("greeting lane", () => {
     }, { gapMs: 60, maxBatch: 6, maxQueue: 100 });
 
     const results = await Promise.all(Array.from({ length: 40 }, (_, i) => lane.enqueue(g(i))));
-    expect(results.every(Boolean)).toBe(true);
+    expect(results.every((r) => r === "sent")).toBe(true);
     const ids = sent.flatMap((s) => s.batch.items.map((x) => x.id));
     expect(ids).toEqual(Array.from({ length: 40 }, (_, i) => `g${i}`));
     expect(sent.length).toBeLessThanOrEqual(10); // 40 / 6 → 7 messages, never 40
@@ -29,12 +29,42 @@ describe("greeting lane", () => {
     expect(Date.now() - started).toBeLessThan(200);
   });
 
-  it("says it is full before the queue overflows, and tells every sender if Ably refused", async () => {
+  it("a full queue answers busy at once — even when 120 requests pass canAccept() together", async () => {
+    const sent: number[] = [];
+    const lane = createGreetingLane(async (b) => (sent.push(b.items.length), true), { gapMs: 20, maxBatch: 6, maxQueue: 24 });
+    // every caller saw canAccept() = true before any of them enqueued (the QA lane-race case)
+    const answers = await Promise.all(Array.from({ length: 120 }, (_, i) => (lane.canAccept() ? lane.enqueue(g(i)) : Promise.resolve("busy"))));
+    expect(answers.filter((a) => a === "sent")).toHaveLength(24);
+    expect(answers.filter((a) => a === "busy")).toHaveLength(96);
+    expect(sent.reduce((a, b) => a + b, 0)).toBe(24);
+    expect(lane.pending()).toBe(0);
+  });
+
+  it("tells every sender if Ably refused", async () => {
     const lane = createGreetingLane(async () => false, { gapMs: 20, maxBatch: 2, maxQueue: 4 });
     const pending = [1, 2, 3, 4].map((i) => lane.enqueue(g(i)));
     expect(lane.canAccept()).toBe(false);
-    expect(await Promise.all(pending)).toEqual([false, false, false, false]);
+    expect(await Promise.all(pending)).toEqual(["failed", "failed", "failed", "failed"]);
     expect(lane.canAccept()).toBe(true);
+  });
+
+  it("drops a batch whose switch was closed after the gate said ok — nothing is published", async () => {
+    let open = true;
+    const published: string[] = [];
+    const lane = createGreetingLane(async (b) => (published.push(...b.items.map((x) => x.id)), true), {
+      gapMs: 10,
+      maxBatch: 3,
+      maxQueue: 10,
+      stillOpen: async () => open,
+    });
+    expect(await lane.enqueue(g(1))).toBe("sent");
+    const waiting = [g(2), g(3)].map((x) => lane.enqueue(x));
+    open = false; // MC flips the switch while they wait
+    expect(await Promise.all(waiting)).toEqual(["closed", "closed"]);
+    expect(published).toEqual(["g1"]);
+    open = true;
+    expect(await lane.enqueue(g(4))).toBe("sent");
+    expect(published).toEqual(["g1", "g4"]);
   });
 
   it("a send that throws counts as failed, the lane keeps working", async () => {
@@ -43,13 +73,13 @@ describe("greeting lane", () => {
       if (n++ === 0) throw new Error("boom");
       return true;
     }, { gapMs: 10, maxBatch: 1, maxQueue: 10 });
-    expect(await lane.enqueue(g(1))).toBe(false);
-    expect(await lane.enqueue(g(2))).toBe(true);
+    expect(await lane.enqueue(g(1))).toBe("failed");
+    expect(await lane.enqueue(g(2))).toBe("sent");
   });
 });
 
 describe("scan count lane", () => {
-  const c = (count: number, at: number): ScanCount => ({ count, at });
+  const c = (count: number, rev: number): ScanCount => ({ count, rev });
 
   it("100 arrivals at once → a few messages, the newest count arrives last", async () => {
     const sent: number[] = [];

@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     // Stage link with its key, for the MC's copy button — only ever sent to a signed-in MC
     const k = process.env.STAGE_KEY;
     const scans = await readScanCount();
-    return json({ ...(await readAdminOverview()), scans: scans.count, stage_path: k ? withBase(`/stage?k=${encodeURIComponent(k)}`) : null });
+    return json({ ...(await readAdminOverview()), scans: scans?.count ?? null, stage_path: k ? withBase(`/stage?k=${encodeURIComponent(k)}`) : null });
   } catch (e) {
     return serverError("admin/overview", e);
   }

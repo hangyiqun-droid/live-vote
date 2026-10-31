@@ -13,6 +13,8 @@ export function actionError(code: string | undefined): string {
       return "ชื่อรางวัลต้องมี 1–80 ตัวอักษร (คำอธิบายไม่เกิน 120)";
     case "not_found":
       return "ไม่พบรางวัลนี้ ลองรีเฟรชหน้าอีกครั้ง";
+    case "not_ready":
+      return "ฟังก์ชันนี้ยังไม่พร้อม ฐานข้อมูลยังไม่ได้อัปเดตรอบล่าสุด แจ้งผู้ดูแลระบบ";
     case "unauthorized":
       return "หมดเวลาเข้าสู่ระบบ ใส่รหัสใหม่อีกครั้ง";
     default:

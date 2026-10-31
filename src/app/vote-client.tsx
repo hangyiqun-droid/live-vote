@@ -272,7 +272,7 @@ export function VoteClient() {
       {s && !activeAward && <Waiting state={s} />}
 
       {/* Greetings only while the stage shows the lobby and the MC switch is on (fix9) */}
-      {s && !activeAward && s.current_award_id === null && !s.show_hall && s.greetings_on && <GreetingBox />}
+      {s && !activeAward && s.current_award_id === null && !s.show_hall && s.greetings_on === true && <GreetingBox />}
 
       {activeAward && voting && pick !== null && (
         <ConfirmSheet

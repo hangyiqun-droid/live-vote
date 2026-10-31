@@ -19,6 +19,9 @@ import {
   type Rect,
 } from "@/app/stage/lobby-layout";
 import { nominees } from "@/data/nominees";
+import { qrPath } from "@/app/stage/qr";
+import { qrSide } from "@/app/stage/qr-size";
+import { QR_MAX_PX, QR_PX } from "@/app/stage/lobby-layout";
 
 const slots = Array.from({ length: BUBBLE_SLOTS }, (_, i) => bubbleSlot(i));
 const countBox: Rect = { x: LEFT_W, y: COUNT_TOP, w: RIGHT_W, h: COUNT_H };
@@ -71,5 +74,33 @@ describe("backup address stays on one line", () => {
     // the estimate the font size is based on is never wider than the room
     expect(long.length * 0.56 * size).toBeLessThanOrEqual(URL_ROOM);
     expect(fitTitle("vote.example.com", 40, URL_ROOM)).toBe(40);
+  });
+});
+
+describe("lobby QR size (SPEC 4.1: at least 360 px)", () => {
+  const urls = ["https://vote.example.com", "https://live-vote-demo.vercel.app"];
+
+  it.each(urls)("%s is drawn at least 360 px wide, in whole pixels per module, inside the reserved box", (url) => {
+    const { size } = qrPath(url);
+    const side = qrSide(size, QR_PX);
+    expect(side).toBeGreaterThanOrEqual(360);
+    expect(side).toBeLessThanOrEqual(QR_MAX_PX);
+    expect(side % size).toBe(0);
+    // what the layout reserved for the QR box holds the real one with its white margin
+    expect(side + 36).toBeLessThanOrEqual(qrRect().w);
+  });
+
+  it("the reserved QR box still touches no bubble slot, counter or face", () => {
+    for (const r of [...slots, countBox, ...faceRects()]) expect(overlaps(qrRect(), r)).toBe(false);
+    expect(inside(qrRect(), canvasRect())).toBe(true);
+  });
+
+  it("the rescue QR keeps whole pixels per module too", () => {
+    for (const url of urls) {
+      const { size } = qrPath(url);
+      const side = qrSide(size, 208);
+      expect(side).toBeGreaterThanOrEqual(208);
+      expect(side % size).toBe(0);
+    }
   });
 });

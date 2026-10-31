@@ -102,3 +102,89 @@ describe("swear-word filter (Thai + English)", () => {
     expect(isBlocked("ปีนี้ 2569 สนุกมาก")).toBe(false);
   });
 });
+
+// fix9 R1 — the cases QA v0.7.0 found slipping through, written with escapes so no invisible
+// character sits in this file. The filter is best effort and is not claimed to catch everything.
+const cp = (...n: number[]) => String.fromCodePoint(...n);
+const tag = (c: string) => cp(0xe0000 + c.charCodeAt(0)); // a Unicode "tag" letter: invisible
+
+describe("QA v0.7.0 probes (R1)", () => {
+  it.each([
+    ["fu.ck", "fu.ck"],
+    ["sh!t", "sh!t"],
+    ["สั้ส (tone mark between)", "สั" + cp(0x0e49) + "ส"],
+    ["สัส with a thanthakhat", "สัส" + cp(0x0e4c)],
+    ["ควย with an invisible tag letter inside", "ค" + tag("a") + "วย"],
+    ["ควย with several tag letters", tag("x") + "ค" + tag("y") + tag("z") + "ว" + tag("q") + "ย"],
+    ["fuck with a zero-width joiner", "fu" + cp(0x200d) + "ck"],
+    ["fuck with a zero-width space", "fu" + cp(0x200b) + "ck"],
+    ["fuck with a soft hyphen", "fu" + cp(0x00ad) + "ck"],
+    ["fuck with a variation selector", "fu" + cp(0xfe0f) + "ck"],
+    ["fuck with a Mongolian selector", "fu" + cp(0x180b) + "ck"],
+    ["fuck with a Hangul filler", "fu" + cp(0x3164) + "ck"],
+    ["fuck with a BOM", "fu" + cp(0xfeff) + "ck"],
+    ["fuck with a right-to-left override", cp(0x202e) + "fuck"],
+    ["full-width ｆｕｃｋ", "ｆｕｃｋ"],
+    ["bold maths letters 𝐟𝐮𝐜𝐤", cp(0x1d41f, 0x1d42e, 0x1d41c, 0x1d424)],
+    ["accented fúck", "f" + cp(0x00fa) + "ck"],
+    ["fuck with a stray combining accent", "fu" + cp(0x0301) + "ck"],
+    ["Cyrillic look-alikes fuсk", "fu" + cp(0x0441) + "k"],
+    ["Greek look-alikes fυck", "f" + cp(0x03c5) + "ck"],
+    ["f@ck", "f@ck"],
+    ["f*ck", "f*ck"],
+    ["fuuuuuck", "fuuuuuck"],
+    ["f-u-c-k", "f-u-c-k"],
+    ["f_u_c_k", "f_u_c_k"],
+    ["fu ck", "fu ck"],
+    ["s h i t", "s h i t"],
+    ["sh1t", "sh1t"],
+    ["a$$hole", "a$$hole"],
+    ["b!tch", "b!tch"],
+    ["ALL CAPS FUCK", "FUCK"],
+    ["fuck!", "fuck!"],
+    ["(fuck)", "(fuck)"],
+    ["inside a sentence", "ขอบคุณมากครับ fuck เลย"],
+    ["Thai with dots ค.ว.ย", "ค.ว.ย"],
+    ["Thai with spaces เ หี้ ย", "เ หี้ ย"],
+    ["Thai stretched เหี้ยยยยย", "เหี้ยยยยย"],
+    ["Thai digits in a phone number ๐๘๑๒๓๔๕๖๗๘", "โทร ๐๘๑๒๓๔๕๖๗๘"],
+  ])("blocks %s", (_name, text) => {
+    expect(cleanGreeting(text), _name).toEqual({ ok: false, reason: "blocked" });
+  });
+
+  it("never lets an invisible character reach the screen", () => {
+    const dirty = "สวัสดี" + tag("a") + tag("b") + cp(0x200b, 0x200d, 0x202e, 0x2066, 0xe000, 0x00ad, 0x180b) + "ครับ";
+    const out = sanitize(dirty);
+    expect(out).toBe("สวัสดีครับ");
+    for (const c of Array.from(out)) expect(c.codePointAt(0)!).toBeLessThan(0xe000);
+    expect(cleanGreeting(dirty)).toEqual({ ok: true, text: "สวัสดีครับ" });
+  });
+
+  it("ordinary words, names and food still pass", () => {
+    for (const t of [
+      "เชี่ยวชาญ",
+      "กะหรี่ปั๊บ",
+      "สาดน้ำ",
+      "ห่างไกล",
+      "แม่งานเก่ง",
+      "เสือกระดาษ",
+      "ส.ส. มาแล้ว",
+      "ยินดีด้วยครับ 5555",
+      "Pornchai & Sussex & Essex",
+      "as soon as possible, pass the class",
+      "Dickson, Cockburn and Hancock say hi",
+      "Scunthorpe, peacock, cocktail",
+      "Niger and Nigeria",
+      "assistant",
+      "Go AMBER! ❤️ " + cp(0x1f389),
+    ]) {
+      expect(cleanGreeting(t).ok, t).toBe(true);
+    }
+  });
+
+  it("is honest about its limits: it is a list, not a promise", () => {
+    // Spelled with a letter swapped for something this list does not know about, it gets through.
+    // The MC switch "ข้อความทักทายขึ้นจอ" exists for exactly this.
+    expect(cleanGreeting("phuck").ok).toBe(true);
+  });
+});

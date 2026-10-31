@@ -23,8 +23,9 @@ export async function POST(req: NextRequest) {
   const device = resolveDeviceId(req, fromClient);
   try {
     const scan = await recordScan(device.id);
-    if (scan.isNew) after(() => publishScanCount({ count: scan.count, at: scan.at }));
-    const res = json({ result: "ok", device_id: device.id });
+    if (scan?.isNew) after(() => publishScanCount({ count: scan.count, rev: scan.rev }));
+    // scan === null: the database has no lobby counter yet (migration 0006) — nothing to count, nothing to fail
+    const res = json({ result: scan ? "ok" : "unavailable", device_id: device.id });
     if (device.fresh) setDeviceCookie(res, device.id);
     return res;
   } catch (e) {

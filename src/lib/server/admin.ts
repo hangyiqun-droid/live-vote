@@ -3,6 +3,7 @@ import { callFn } from "@/db/client";
 import { EXTEND_SECONDS, TIMER_CHOICES, type AdminAction } from "@/lib/admin-actions";
 import type { AdminOverview, EventState } from "@/lib/types";
 import { publishEvent, publishTally } from "./ably";
+import { isMissingSchema } from "@/db/schema-missing";
 import { resetScans } from "./lobby";
 import { readEventState, readSnapshot } from "./state";
 
@@ -55,6 +56,16 @@ export function parseAction(b: Record<string, unknown>): AdminAction | null {
   }
 }
 
+// The lobby extras need migration 0006; before it the MC gets a plain Thai "not ready", not a 503
+async function notReady(fn: () => Promise<FnResult>): Promise<FnResult> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (isMissingSchema(e)) return { ok: false, error: "not_ready" };
+    throw e;
+  }
+}
+
 async function run(a: AdminAction): Promise<FnResult> {
   switch (a.action) {
     case "show":
@@ -88,10 +99,10 @@ async function run(a: AdminAction): Promise<FnResult> {
     case "qr_fallback":
       return callFn("set_qr_fallback", [a.on]);
     case "greetings":
-      return callFn("set_greetings", [a.on]);
+      return notReady(() => callFn<FnResult>("set_greetings", [a.on]));
     case "reset_scans":
-      await resetScans(); // clears the table and tells the stage straight away
-      return { ok: true };
+      // clears the table and tells the stage straight away
+      return notReady(async () => (await resetScans(), { ok: true }));
     case "rename":
       return callFn("set_award_title", [a.award_id, a.title, a.subtitle]);
   }

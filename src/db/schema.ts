@@ -74,6 +74,23 @@ export const scannedDevices = pgTable("scanned_devices", {
   lastGreetAt: timestamp("last_greet_at", { withTimezone: true }),
 });
 
+// fix9: one row. `scan_rev` moves every time the set of scanned devices changes, inside the same
+// transaction (the row is locked first), so a revision always names exactly one committed count and
+// the stage can order counts by it instead of trusting clocks. Also the lock that keeps the counter,
+// greetings pacing and reset in one order (lobby_stats → scanned_devices → greeting_requests).
+export const lobbyStats = pgTable("lobby_stats", {
+  id: smallint("id").primaryKey().default(1),
+  scanRev: bigint("scan_rev", { mode: "number" }).notNull().default(0),
+}, (t) => [check("lobby_stats_singleton", sql`${t.id} = 1`)]);
+
+// fix9: HMAC of a greeting's random request id + when it passed the gate, kept 60 s. It lets every
+// server instance answer a retry with "sent" and enforces the app-wide greetings-per-second ceiling.
+// The text of a greeting is never here.
+export const greetingRequests = pgTable("greeting_requests", {
+  requestHash: bytea("request_hash").primaryKey(),
+  at: timestamp("at", { withTimezone: true }).notNull().defaultNow(),
+});
+
 // Admin actions only, never votes
 export const adminLog = pgTable("admin_log", {
   id: bigserial("id", { mode: "number" }).primaryKey(),

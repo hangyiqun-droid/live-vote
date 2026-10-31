@@ -21,11 +21,13 @@ export function Lobby({
   link,
   scans,
   greetingsOn,
+  showCount,
 }: {
   title: string;
   link: LinkProps;
   scans: number | null;
   greetingsOn: boolean;
+  showCount: boolean;
 }) {
   return (
     <>
@@ -51,9 +53,11 @@ export function Lobby({
           </div>
         ))}
       </div>
-      <div className={s.lobbyCount} style={{ top: COUNT_TOP, height: COUNT_H }}>
-        <LobbyCount value={scans} />
-      </div>
+      {showCount && (
+        <div className={s.lobbyCount} style={{ top: COUNT_TOP, height: COUNT_H }}>
+          <LobbyCount value={scans} />
+        </div>
+      )}
       <aside className={s.lobbyQr} style={{ top: QR_TOP }}>
         <QrCode qr={link.qr} px={QR_PX} />
         <p className={s.qrHint}>สแกนเพื่อโหวต</p>

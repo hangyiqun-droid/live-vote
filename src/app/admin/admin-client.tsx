@@ -310,9 +310,9 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
           <button
             type="button"
             role="switch"
-            aria-checked={state.greetings_on}
+            aria-checked={state.greetings_on === true}
             className={state.greetings_on ? `${a.switch} ${a.switchOn}` : a.switch}
-            disabled={busy !== null}
+            disabled={busy !== null || state.greetings_on === undefined}
             onClick={() =>
               void send({ action: "greetings", on: !state.greetings_on }, state.greetings_on ? "ปิดข้อความขึ้นจอ" : "เปิดข้อความขึ้นจอ")
             }
@@ -325,7 +325,7 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
         <div className={a.statusRow}>
           <span className={a.pill} role="status" data-scans={ov.scans ?? ""}>
             <UsersIcon aria-hidden />
-            {ov.scans === null ? "กำลังนับคนสแกน…" : `สแกนแล้ว ${ov.scans.toLocaleString("th-TH")} คน`}
+            {ov.scans === null ? "ตัวนับคนสแกนยังไม่พร้อม" : `สแกนแล้ว ${ov.scans.toLocaleString("th-TH")} คน`}
           </span>
           <HoldButton
             tone="danger"

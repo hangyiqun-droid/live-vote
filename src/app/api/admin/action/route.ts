@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   try {
     const r = await runAdminAction(action);
     const overview = await readAdminOverview();
-    const scans = (await readScanCount()).count;
+    const scans = (await readScanCount())?.count ?? null;
     console.log(`[admin] ${action.action}${"award_id" in action ? ` ${action.award_id}` : ""} ${r.ok ? "ok" : r.error}`);
     return json(r.ok ? { ok: true, overview, scans } : { ok: false, error: r.error, overview, scans }, r.ok ? 200 : 409);
   } catch (e) {
