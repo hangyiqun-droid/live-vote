@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { ClockIcon, DevicePhoneMobileIcon } from "@heroicons/react/24/solid";
+import { ClockIcon } from "@heroicons/react/24/solid";
 import type { AwardState } from "@/lib/types";
 import { Count } from "./count";
+import { fitTitle } from "./title-fit";
 import s from "./stage.module.css";
 
 export type LinkProps = {
@@ -12,9 +13,9 @@ export type LinkProps = {
   eventTitle: string;
 };
 
-export function QrCode({ qr, px }: { qr: LinkProps["qr"]; px: number }) {
+export function QrCode({ qr, px, small }: { qr: LinkProps["qr"]; px: number; small?: boolean }) {
   return (
-    <div className={s.qrCard}>
+    <div className={small ? `${s.qrCard} ${s.qrCardSmall}` : s.qrCard}>
       <svg width={px} height={px} viewBox={`0 0 ${qr.size} ${qr.size}`} shapeRendering="crispEdges" role="img" aria-label="QR โหวต">
         <path d={qr.d} fill="#0b1026" />
       </svg>
@@ -22,14 +23,20 @@ export function QrCode({ qr, px }: { qr: LinkProps["qr"]; px: number }) {
   );
 }
 
-// Right ~30%: running total, countdown, and a small "vote on your phone" line for late arrivals.
-// No QR here on purpose: phones follow the MC on their own, a QR on screen made people rescan (SPEC 4.1)
+// Right ~30%: running total, countdown, and a small rescue QR at the bottom for phones that dropped
+// out. Phones follow the MC on their own and the big QR lives on the lobby only, so this one says
+// "for lost phones" — not "everyone scan" (SPEC 4.1, fix9 follow-up). Same QR as the lobby, so the
+// MC's backup-link switch swaps it too.
+export const RESCUE_QR_PX = 208;
+export const RESCUE_URL_ROOM = 500; // the address stays on one line inside this width
+
 export function VotePanel({
+  qr,
   urlLabel,
   total,
   award,
   clockOffset,
-}: Pick<LinkProps, "urlLabel"> & { total: number; award: AwardState; clockOffset: number }) {
+}: Pick<LinkProps, "qr" | "urlLabel"> & { total: number; award: AwardState; clockOffset: number }) {
   const totalRef = useRef<HTMLDivElement>(null);
   const last = useRef(total);
 
@@ -54,10 +61,12 @@ export function VotePanel({
         <Countdown endsAt={Date.parse(award.auto_close_at)} clockOffset={clockOffset} />
       )}
       {award.status === "open" && (
-        <div className={s.voteHint}>
-          <DevicePhoneMobileIcon aria-hidden />
-          <p>โหวตบนมือถือได้เลย</p>
-          <p className={s.voteUrl}>{urlLabel}</p>
+        <div className={s.voteHint} data-rescue-qr>
+          <QrCode qr={qr} px={RESCUE_QR_PX} small />
+          <p>มือถือหลุด สแกนเข้าใหม่ได้</p>
+          <p className={s.voteUrl} data-rescue-url style={{ fontSize: fitTitle(urlLabel, 26, RESCUE_URL_ROOM) }}>
+            {urlLabel}
+          </p>
         </div>
       )}
     </aside>

@@ -186,6 +186,13 @@
   display: block;
 }
 
+/* The rescue QR on the open scene: white card + quiet zone kept, just tighter than the lobby's */
+.qrCardSmall {
+  padding: 12px;
+  border-radius: 20px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.45);
+}
+
 .qrHint {
   margin-top: 24px;
   font-size: 44px;
@@ -444,7 +451,7 @@
   position: absolute;
   left: 0;
   right: 0;
-  bottom: 72px;
+  bottom: 56px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -452,20 +459,18 @@
   color: rgb(255 255 255 / 0.72);
 }
 
-.voteHint svg {
-  width: 52px;
-  height: 52px;
-  margin-bottom: 6px;
-}
-
 .voteHint p {
-  font-size: 34px;
+  margin-top: 8px;
+  font-size: 32px;
   font-weight: 700;
 }
 
+/* font-size is set per address (fitTitle) so the long backup address stays on one line */
 .voteHint .voteUrl {
+  margin-top: 0;
   font-size: 26px;
   font-weight: 400;
+  white-space: nowrap;
   color: rgb(255 255 255 / 0.55);
 }
 
