@@ -5,6 +5,7 @@ import {
   BUBBLE_SLOTS,
   LEFT_W,
   QR_TOP,
+  RIGHT_TEXT_LEFT,
   URL_ROOM,
   bubbleSlot,
   bubbleZone,
@@ -31,10 +32,10 @@ describe("lobby bounding boxes", () => {
     expect(faceRects()).toHaveLength(nominees.length);
   });
 
-  it("all six bubble slots sit inside the canvas and inside the left area", () => {
+  it("all six bubble slots sit inside the canvas and end before the QR column's text (fix10: 18 px for tilt and pop)", () => {
     for (const r of slots) {
       expect(inside(r, canvasRect())).toBe(true);
-      expect(r.x + r.w).toBeLessThanOrEqual(LEFT_W);
+      expect(r.x + r.w + 18).toBeLessThanOrEqual(RIGHT_TEXT_LEFT);
     }
   });
 

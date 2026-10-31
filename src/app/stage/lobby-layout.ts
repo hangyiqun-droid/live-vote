@@ -27,17 +27,23 @@ export const QR_PAD = 18;
 export const QR_TOP = 290;
 export const QR_BOX = QR_MAX_PX + QR_PAD * 2;
 export const URL_ROOM = 560; // the address must stay on one line inside this width
+export const RIGHT_TEXT_LEFT = 1340; // the QR column's text (hint, address, wait line) never starts left of this; bubbles end 18 px short of it
 
-// Bubble zone: 3 columns × 2 rows of fixed slots under the faces
+// Bubble zone: 3 columns × 2 rows of fixed slots under the faces (fix10: each slot is a speech bubble
+// of BUBBLE_BODY_H plus a tail of BUBBLE_TAIL_H pointing down; the tail is part of the slot)
 export const BUBBLE_COLS = 3;
 export const BUBBLE_ROWS = 2;
-export const BUBBLE_W = 390;
-export const BUBBLE_H = 126;
-export const BUBBLE_GAP_X = 25;
-export const BUBBLE_GAP_Y = 12;
-export const BUBBLE_ZONE_LEFT = 40;
+export const BUBBLE_W = 410;
+export const BUBBLE_TAIL_H = 12;
+export const BUBBLE_BODY_H = 124;
+export const BUBBLE_H = BUBBLE_BODY_H + BUBBLE_TAIL_H;
+export const BUBBLE_GAP_X = 26;
+export const BUBBLE_GAP_Y = 2;
+export const BUBBLE_ZONE_LEFT = 36;
 export const BUBBLE_ZONE_TOP = 790;
 export const BUBBLE_SLOTS = BUBBLE_COLS * BUBBLE_ROWS;
+// How far a bubble drifts up over its life: the top row has the faces above it, the bottom row the tails of the top row
+export const BUBBLE_RISE = [14, 14, 14, 4, 4, 4] as const;
 
 export const bubbleSlot = (i: number): Rect => ({
   x: BUBBLE_ZONE_LEFT + (i % BUBBLE_COLS) * (BUBBLE_W + BUBBLE_GAP_X),
