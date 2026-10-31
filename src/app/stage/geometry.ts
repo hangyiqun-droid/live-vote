@@ -4,7 +4,7 @@ import { LANES } from "./race";
 
 export const W = 1920;
 export const H = 1080;
-export const RACE_W = 1344; // left ~70%: race · right ~30%: QR panel
+export const RACE_W = 1344; // left ~70%: race · right ~30%: vote panel
 export const PAD = 56;
 
 export const LANE_TOP = 168;
@@ -24,7 +24,8 @@ export const STRIP_STEP = (RACE_W - PAD * 2) / STRIP_SLOTS;
 export const STRIP_PHOTO_W = 50;
 export const STRIP_SCALE = STRIP_PHOTO_W / PHOTO_W;
 
-export const QR_CENTER = { x: RACE_W + (W - RACE_W) / 2, y: 400 };
+// Where the vote dots start: the running total in the right panel
+export const VOTE_ORIGIN = { x: RACE_W + (W - RACE_W) / 2, y: 400 };
 
 export const laneY = (slot: number) => LANE_TOP + slot * LANE_STEP;
 export const stripX = (slot: number) => PAD + (slot - LANES) * STRIP_STEP + (STRIP_STEP - STRIP_PHOTO_W) / 2;

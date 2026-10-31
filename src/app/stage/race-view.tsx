@@ -14,18 +14,18 @@ import {
   PAD,
   PHOTO_H,
   PHOTO_W,
-  QR_CENTER,
   STRIP_PHOTO_W,
   STRIP_SCALE,
   STRIP_STEP,
   STRIP_TOP,
+  VOTE_ORIGIN,
   laneY,
   photoPlace,
 } from "./geometry";
 import { groupVars } from "./palette";
-import { QrPanel, type QrProps } from "./qr-panel";
 import { LANES, chasingIds, diffRows, idOrderRows, raceSound, rankRows, type Row } from "./race";
 import { fitTitle } from "./title-fit";
+import { VotePanel, type LinkProps } from "./vote-panel";
 import s from "./stage.module.css";
 
 const HIDDEN_BAR = 0.62; // every bar the same length while counts are hidden (SPEC 4.1)
@@ -38,13 +38,13 @@ export function RaceView({
   award,
   tally,
   hide,
-  qr,
+  link,
   clockOffset,
 }: {
   award: AwardState;
   tally: TallySnapshot | undefined;
   hide: boolean;
-  qr: QrProps;
+  link: LinkProps;
   clockOffset: number;
 }) {
   const live = useMemo(() => rankRows(tally?.counts ?? [], tally?.order), [tally]);
@@ -117,7 +117,7 @@ export function RaceView({
       <header className={s.raceHeader}>
         <div>
           {/* A long name takes two lines, so it gets the event line's place above the first lane */}
-          {award.title.length <= LONG_TITLE && <p>{qr.eventTitle}</p>}
+          {award.title.length <= LONG_TITLE && <p>{link.eventTitle}</p>}
           <h1 style={{ fontSize: fitTitle(award.title, 66, 1240) }}>{award.title}</h1>
         </div>
         <span className={award.status === "open" ? s.status : `${s.status} ${s.statusOff}`}>
@@ -158,7 +158,7 @@ export function RaceView({
         </>
       )}
 
-      <QrPanel {...qr} total={total} award={award} clockOffset={clockOffset} />
+      <VotePanel {...link} total={total} award={award} clockOffset={clockOffset} />
     </>
   );
 }
@@ -201,7 +201,7 @@ function flyDot(layer: HTMLDivElement, to: { x: number; y: number }) {
   const jitter = (Math.random() - 0.5) * 160;
   const a = dot.animate(
     [
-      { transform: `translate(${QR_CENTER.x}px, ${QR_CENTER.y + jitter}px) scale(1.4)`, opacity: 0 },
+      { transform: `translate(${VOTE_ORIGIN.x}px, ${VOTE_ORIGIN.y + jitter}px) scale(1.4)`, opacity: 0 },
       { opacity: 1, offset: 0.15 },
       { transform: `translate(${to.x}px, ${to.y}px) scale(0.8)`, opacity: 1, offset: 0.92 },
       { transform: `translate(${to.x}px, ${to.y}px) scale(2.2)`, opacity: 0 },

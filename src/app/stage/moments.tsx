@@ -19,7 +19,7 @@ export function OpenIntro({ title, onDone }: { title: string; onDone: () => void
   );
 }
 
-// Countdown side effects (the number itself is drawn in the QR panel): a sound cue for each of
+// Countdown side effects (the number itself is drawn in the vote panel): a sound cue for each of
 // the last 10 seconds, and at zero the stage asks the server to close the award (SPEC 3.1
 // /api/admin/expire — idempotent, the server clock decides).
 export function CountdownCues({ award, clockOffset }: { award: AwardState; clockOffset: number }) {

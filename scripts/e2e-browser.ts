@@ -133,7 +133,7 @@ async function main() {
   await stage.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
   await stage.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
   await stage.locator("[data-stage-total]").waitFor();
-  // The total under the QR (the digits roll, so read the value the stage is showing/rolling to)
+  // The total in the right panel (the digits roll, so read the value the stage is showing/rolling to)
   const shown = async () => Number(await stage.locator("[data-stage-total]").getAttribute("data-stage-total"));
   const totalIs = (n: number) => document.querySelector("[data-stage-total]")?.getAttribute("data-stage-total") === String(n);
   // Live update while connected

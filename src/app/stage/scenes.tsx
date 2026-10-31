@@ -4,7 +4,6 @@ import { GROUPS, nominees } from "@/data/nominees";
 import { photoSrc } from "@/components/photo";
 import type { AwardState } from "@/lib/types";
 import { groupVars } from "./palette";
-import { QrCode, type QrProps } from "./qr-panel";
 import { WarmUp } from "./race-view";
 import { fitTitle } from "./title-fit";
 import s from "./stage.module.css";
@@ -40,22 +39,18 @@ export function Lobby({ title }: { title: string }) {
   );
 }
 
-// Award chosen but not open yet: big title card + QR so people can scan early (SPEC 4.1 "pending")
-export function Pending({ award, qr }: { award: AwardState; qr: QrProps }) {
+// Award chosen but not open yet: the award name fills the screen, no QR — phones switch by themselves,
+// so a code here only made people rescan (SPEC 4.1 "pending")
+export function Pending({ award, eventTitle }: { award: AwardState; eventTitle: string }) {
   return (
     <>
       <WarmUp />
       <div className={s.pending}>
         <div className={s.pendingCard}>
-          <p>{qr.eventTitle}</p>
-          <h1 style={{ fontSize: fitTitle(award.title, 104, 1500) }}>{award.title}</h1>
+          <p className={s.pendingEvent}>{eventTitle}</p>
+          <h1 style={{ fontSize: fitTitle(award.title, 168, 1560) }}>{award.title}</h1>
           {award.subtitle && <h2>{award.subtitle}</h2>}
-          <h2>สแกนเตรียมไว้ได้เลย</h2>
-        </div>
-        <div style={{ textAlign: "center" }}>
-          <QrCode qr={qr.qr} px={440} />
-          <p className={s.qrHint}>สแกนเพื่อโหวต</p>
-          <p className={s.qrUrl}>{qr.urlLabel}</p>
+          <p className={s.pendingWait}>รอพิธีกรเปิดโหวต</p>
         </div>
       </div>
     </>

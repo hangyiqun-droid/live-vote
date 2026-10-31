@@ -11,7 +11,6 @@ import { fetchWithTimeout } from "@/lib/uuid";
 import { Canvas } from "./canvas";
 import { cue, type MusicKey } from "./cues";
 import { CountdownCues, OpenIntro } from "./moments";
-import type { QrProps } from "./qr-panel";
 import { RaceView } from "./race-view";
 import { Hall, Reveal } from "./reveal";
 import r from "./reveal.module.css";
@@ -20,6 +19,7 @@ import { SoundControls, SoundNotice, StartGate } from "./sound/controls";
 import { SoundDemo } from "./sound/demo";
 import { useShow } from "./sound/use-show";
 import s from "./stage.module.css";
+import type { LinkProps } from "./vote-panel";
 
 const RESYNC_MS = 15_000;
 const LOST_AFTER_MS = 10_000;
@@ -48,7 +48,7 @@ function detectMoments(before: EventState, after: EventState, m: Moments): Momen
 const noSubscribe = () => () => undefined;
 
 // /stage?demo=sound opens the sound test page instead of the live screen
-export function StageClient(props: { qr: QrProps; qrFallback: QrProps | null }) {
+export function StageClient(props: { link: LinkProps; linkFallback: LinkProps | null }) {
   const demo = useSyncExternalStore(
     noSubscribe,
     () => new URLSearchParams(window.location.search).get("demo") === "sound",
@@ -64,7 +64,7 @@ function musicFor(state: EventState | null): MusicKey | null {
   return !state.show_hall && award?.status === "open" ? "bgm_voting" : "bgm_lobby";
 }
 
-function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProps | null }) {
+function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFallback: LinkProps | null }) {
   const show = useShow();
   const [phase, setPhase] = useState<Phase>("loading");
   const [state, setState] = useState<EventState | null>(null);
@@ -196,7 +196,7 @@ function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProp
       <SoundControls engine={show.engine} />
     </>
   ) : (
-    <StartGate title={qrMain.eventTitle} onStart={show.start} />
+    <StartGate title={linkMain.eventTitle} onStart={show.start} />
   );
 
   if (phase === "no_key" || phase === "bad_key") {
@@ -214,7 +214,7 @@ function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProp
     return (
       <Canvas overlay={sound}>
         <div className={s.message} role="status">
-          <p>{qrMain.eventTitle}</p>
+          <p>{linkMain.eventTitle}</p>
           <div className={s.progress}>
             <div className={s.progressFill} style={{ transform: `scaleX(${photos / nominees.length})` }} />
           </div>
@@ -225,7 +225,8 @@ function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProp
   }
 
   const award = state.awards.find((a) => a.id === state.current_award_id) ?? null;
-  const qr = state.qr_fallback && qrFallback ? qrFallback : qrMain;
+  // The backup switch swaps the web address shown on the open screen
+  const link = state.qr_fallback && linkFallback ? linkFallback : linkMain;
   const tally = award && tallies[award.id]?.round === award.round ? tallies[award.id] : undefined;
   const momentFor = (k: string | null) => !!award && !!k && k.startsWith(`${award.id}:${award.round}:`);
   const revealed = award?.status === "revealed";
@@ -238,7 +239,7 @@ function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProp
       ) : !award ? (
         <Lobby title={state.title} />
       ) : award.status === "pending" ? (
-        <Pending award={award} qr={qr} />
+        <Pending award={award} eventTitle={link.eventTitle} />
       ) : (
         <>
           {(!revealed || playReveal) && (
@@ -250,7 +251,7 @@ function LiveStage({ qr: qrMain, qrFallback }: { qr: QrProps; qrFallback: QrProp
                 award={award}
                 tally={tally}
                 hide={state.hide_counts}
-                qr={qr}
+                link={link}
                 clockOffset={clockOffset}
               />
             </div>
