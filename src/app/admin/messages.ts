@@ -14,7 +14,7 @@ export function actionError(code: string | undefined): string {
     case "not_found":
       return "ไม่พบรางวัลนี้ ลองรีเฟรชหน้าอีกครั้ง";
     case "demo_mode":
-      return "ระบบตัวอย่างปิดข้อความทักทายไว้ถาวร เพราะใครก็เข้ามาส่งขึ้นจอได้";
+      return "ระบบตัวอย่างปิดฟังก์ชันนี้ไว้ถาวร เพราะใครก็เข้ามาใช้ได้";
     case "not_ready":
       return "ฟังก์ชันนี้ยังไม่พร้อม ฐานข้อมูลยังไม่ได้อัปเดตรอบล่าสุด แจ้งผู้ดูแลระบบ";
     case "unauthorized":

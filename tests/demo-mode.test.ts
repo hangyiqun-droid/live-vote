@@ -52,6 +52,22 @@ describe("greetings in demo mode", () => {
   });
 });
 
+describe("renaming awards in demo mode", () => {
+  it("is refused on the server and leaves the name alone", async () => {
+    vi.stubEnv("DEMO_MODE", "1");
+    const before = (await readEventState()).awards.find((a) => a.id === 3)!.title;
+    expect(await runAdminAction({ action: "rename", award_id: 3, title: "Renamed by a visitor", subtitle: "" })).toEqual({ ok: false, error: "demo_mode" });
+    expect((await readEventState()).awards.find((a) => a.id === 3)!.title).toBe(before);
+  });
+
+  it("still works outside demo mode", async () => {
+    vi.stubEnv("DEMO_MODE", "");
+    const title = (await readEventState()).awards.find((a) => a.id === 3)!.title;
+    expect((await runAdminAction({ action: "rename", award_id: 3, title: "Temp name", subtitle: "" })).ok).toBe(true);
+    expect((await runAdminAction({ action: "rename", award_id: 3, title, subtitle: "" })).ok).toBe(true);
+  });
+});
+
 describe("GET /api/cron/reset-demo", () => {
   it("is a 404 when DEMO_MODE is not on, even with the right secret", async () => {
     vi.stubEnv("DEMO_MODE", "");
@@ -82,7 +98,7 @@ describe("GET /api/cron/reset-demo", () => {
     expect((await runAdminAction({ action: "reveal", award_id: 1 })).ok).toBe(true);
     expect((await runAdminAction({ action: "open", award_id: 2, seconds: 0 })).ok).toBe(true);
     await callFn("cast_vote", [2, 6, hash(randomUUID()), randomUUID()]);
-    expect((await runAdminAction({ action: "rename", award_id: 3, title: "Renamed by a visitor", subtitle: "" })).ok).toBe(true);
+    await callFn("set_award_title", [3, "Renamed by a visitor", ""]); // as if the name had been changed behind the app's back
     expect((await runAdminAction({ action: "hide", on: true })).ok).toBe(true);
     expect((await runAdminAction({ action: "hall", on: true })).ok).toBe(true);
     const messy = await readEventState();

@@ -67,7 +67,8 @@ async function notReady(fn: () => Promise<FnResult>): Promise<FnResult> {
   }
 }
 
-async function run(a: AdminAction): Promise<FnResult> {
+// `internal` is for the server's own housekeeping (the demo reset), never for a request from a browser
+async function run(a: AdminAction, internal: boolean): Promise<FnResult> {
   switch (a.action) {
     case "show":
       return callFn("set_current_award", [a.award_id]);
@@ -106,6 +107,8 @@ async function run(a: AdminAction): Promise<FnResult> {
       // clears the table and tells the stage straight away
       return notReady(async () => (await resetScans(), { ok: true }));
     case "rename":
+      // A public demo keeps its award names: visitors could otherwise put any text on the big screen
+      if (isDemo() && !internal) return { ok: false, error: "demo_mode" };
       return callFn("set_award_title", [a.award_id, a.title, a.subtitle]);
   }
 }
@@ -123,8 +126,11 @@ async function announce(state: EventState, touched: number | null) {
   }
 }
 
-export async function runAdminAction(a: AdminAction): Promise<{ ok: true } | { ok: false; error: string }> {
-  const r = await run(a);
+export async function runAdminAction(
+  a: AdminAction,
+  opts: { internal?: boolean } = {},
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const r = await run(a, opts.internal === true);
   if (!r.ok) return { ok: false, error: r.error ?? "failed" };
   await announce(await readEventState(), "award_id" in a ? a.award_id : null);
   return { ok: true };

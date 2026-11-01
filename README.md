@@ -20,7 +20,7 @@
 
 </div>
 
-The demo runs in demo mode: every name is made up, the data resets every day, and nothing you type reaches the big screen.
+The demo runs in demo mode: every name is made up, the data resets every day, and no text typed by a visitor can reach the big screen.
 
 ## ✨ What you get
 
@@ -55,7 +55,7 @@ The host opens an award from their phone, a guest taps a name and confirms, and 
 
 <p align="center"><img src="docs/admin.jpg" alt="Host page" width="320"></p>
 
-> The screens are in **Thai** (the app was built for a Thai event). All text lives in the components, so translating is a search-and-replace job; there is no i18n layer yet.
+> The screens are in **Thai**. All text lives in the components, so translating is a search-and-replace job; there is no i18n layer yet.
 
 ## 🚀 Quick start
 
@@ -87,7 +87,7 @@ Push to GitHub and import into [Vercel](https://vercel.com) (or use the button a
 |---|---|
 | Event name | `EVENT_TITLE` in `src/data/nominees.ts`, then `pnpm db:seed --refresh-names` |
 | Award names | `src/data/awards.ts` (or rename them live from the host page) |
-| Nominees | `src/data/nominees.ts`: nickname, first name and one of four groups, 29 of them |
+| Nominees | `src/data/nominees.ts`: nickname, first name and one of four groups, 29 of them. Groups can be any size (the demo uses 9 / 6 / 8 / 6); the lobby fits up to 9 per row |
 | Group names and colours | The four group names appear in `src/data/nominees.ts`, `src/components/avatar.tsx`, `src/components/group.ts` + `src/app/globals.css`, `src/app/stage/palette.ts`, `src/app/stage/bubble-style.ts`, `src/app/admin/admin.module.css`, and the check constraint in `drizzle/0000_init.sql` and `src/db/schema.ts`. Search for one of them and change all |
 | Serve under a sub-path | `NEXT_PUBLIC_BASE_PATH=/vote` at build time |
 | Sounds | `public/audio/` is rebuilt from your own CC0 sources with `pnpm audio <folder>` (needs ffmpeg) |
@@ -118,7 +118,7 @@ The number of nominees (29) and awards (5) is wired into the layouts and the dat
 With `DEMO_MODE=1`:
 
 - the stage, vote page and host page show a small "ข้อมูลตัวอย่าง" (sample data) tag;
-- lobby greetings are off for good, on the server and in the UI, because anyone can open a public demo and the text would land on the big screen;
+- lobby greetings are off for good, on the server and in the UI, and so is renaming awards (the pencil button is hidden and the server refuses the action), because anyone can open a public demo and the text would land on the big screen;
 - `GET /api/cron/reset-demo` (with `Authorization: Bearer $CRON_SECRET`, which Vercel sends for you) puts every award back to empty and pending with its seeded name, returns the stage to the lobby and zeroes the scan counter. `vercel.json` runs it daily. Without demo mode the route answers 404 and does nothing.
 
 ## 🧠 How it works
@@ -133,8 +133,8 @@ host ──POST /api/admin/action──▶ Postgres function (state machine) ─
 
 - **Postgres is the source of truth.** Counting, the one-vote rule and every award state change run inside PL/pgSQL functions (`drizzle/*.sql`), one round trip each. Ably only announces; if a message is lost, the stage re-reads the snapshot every 15 s and on reconnect.
 - **One vote per device**: a random id in an httpOnly cookie plus a localStorage copy; the server stores only an HMAC of it. Clearing browser data or using a private window gives a new device, so this suits a friendly room, not a high-stakes election.
-- **Realtime behind one interface**: screens use `src/lib/live/`, so Ably can be swapped for something else without touching any page.
-- **Animation** uses only `transform` and `opacity` on a fixed 1920×1080 canvas that is scaled to the window.
+- **Realtime stays in two places**: screens talk to it only through `src/lib/live/` (browser side) and `src/lib/server/ably.ts` (publishing), so swapping Ably for another provider does not touch any page.
+- **The stage** is drawn once on a fixed 1920×1080 canvas that is scaled to the window; its animation is built on `transform` and `opacity`.
 
 ## 🧰 Scripts
 

@@ -398,6 +398,7 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
               clockOffset={clockOffset}
               busy={busy}
               send={send}
+              canRename={state.demo !== true}
             />
           </li>
         ))}

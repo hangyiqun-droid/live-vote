@@ -41,9 +41,10 @@ type Props = {
   clockOffset: number;
   busy: string | null;
   send: (act: AdminAction, label: string) => Promise<boolean>;
+  canRename: boolean; // false on a demo deployment
 };
 
-export function AwardCard({ award, tally, current, anotherOpen, clockOffset, busy, send }: Props) {
+export function AwardCard({ award, tally, current, anotherOpen, clockOffset, busy, send, canRename }: Props) {
   const [timer, setTimer] = useState<number | null>(null);
   const [panel, setPanel] = useState<"none" | "reset" | "rename">("none");
   const total = tally?.total ?? 0;
@@ -59,14 +60,16 @@ export function AwardCard({ award, tally, current, anotherOpen, clockOffset, bus
           <h2 className={a.cardTitle}>{award.title}</h2>
           {award.subtitle && <p className={a.cardSub}>{award.subtitle}</p>}
         </div>
-        <button
-          type="button"
-          className={a.iconBtn}
-          aria-label={`แก้ชื่อรางวัล ${award.title}`}
-          onClick={() => setPanel(panel === "rename" ? "none" : "rename")}
-        >
-          <PencilSquareIcon aria-hidden />
-        </button>
+        {canRename && (
+          <button
+            type="button"
+            className={a.iconBtn}
+            aria-label={`แก้ชื่อรางวัล ${award.title}`}
+            onClick={() => setPanel(panel === "rename" ? "none" : "rename")}
+          >
+            <PencilSquareIcon aria-hidden />
+          </button>
+        )}
       </div>
 
       <div className={a.meta}>
@@ -87,7 +90,7 @@ export function AwardCard({ award, tally, current, anotherOpen, clockOffset, bus
         {mine && <ArrowPathIcon className={a.spin} aria-label="กำลังสั่ง…" />}
       </div>
 
-      {panel === "rename" && (
+      {canRename && panel === "rename" && (
         <RenameForm award={award} disabled={locked} send={send} onClose={() => setPanel("none")} />
       )}
 

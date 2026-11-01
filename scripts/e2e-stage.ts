@@ -12,6 +12,7 @@ import { config } from "dotenv";
 import { chromium, type Page } from "playwright-core";
 import { rankRows } from "../src/app/stage/race";
 import { photoPlace } from "../src/app/stage/geometry";
+import { nomineeById } from "../src/data/nominees";
 import type { TallySnapshot } from "../src/lib/types";
 
 config({ path: ".env.local", quiet: true });
@@ -45,11 +46,11 @@ async function vote(nominee: number) {
   if (j.result !== "counted") problems.push(`vote for ${nominee}: ${j.result}`);
 }
 
-// 100 votes: lanes 1–10 warm up, then strip people climb (incl. both ฝ้าย), ending with 18 and 25 tied
+// 100 votes: lanes 1–10 warm up, then strip people climb (incl. both ฝ้าย), ending with 22 and 15 tied
 function burstPlan(): number[] {
   const warm = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap((id) => [id, id, id]); // 30
   const climb: number[] = [];
-  const climbers: Record<number, number> = { 29: 9, 22: 8, 18: 7, 25: 7, 15: 6, 12: 5 }; // 42
+  const climbers: Record<number, number> = { 29: 9, 18: 8, 22: 7, 15: 7, 25: 6, 12: 5 }; // 42
   for (let round = 0; round < 9; round++) for (const [id, n] of Object.entries(climbers)) if (round < n) climb.push(Number(id));
   const tail = [1, 29, 2, 22, 3, 15, 4, 12, 5, 6, 7, 8, 9, 10, 11, 13, 14, 16, 17, 19, 20, 21, 23, 24, 26, 27, 28, 1]; // 28
   return [...warm, ...climb, ...tail];
@@ -189,29 +190,29 @@ async function main() {
 
   await page.screenshot({ path: `${OUT}/stage-race.jpg`, quality: 82 });
 
-  // 2. positions = DB ranking (strip climbers 29, 22, 18, 25, 15, 12 started in the strip)
+  // 2. positions = DB ranking (strip climbers 29, 18, 22, 15, 25, 12 started in the strip)
   const { shown } = await checkMatchesDb(page, "after burst");
-  for (const id of [29, 22, 18, 25]) {
+  for (const id of [29, 18, 22, 15]) {
     if ((shown.get(id)?.slot ?? 99) >= 8) problems.push(`climber ${id} did not reach a lane`);
   }
 
   // 3. two ฝ้าย: both in lanes, each with its own group label
-  const b18 = shown.get(18)!;
-  const b25 = shown.get(25)!;
-  const boats = /ฝ้าย[\s\S]*JADE/.test(b18.laneText) && /ฝ้าย[\s\S]*RUBY/.test(b25.laneText);
-  log.push(`ฝ้าย: no.18 lane ${b18.slot + 1} "${b18.laneText.replace(/\s+/g, " ")}" · no.25 lane ${b25.slot + 1} "${b25.laneText.replace(/\s+/g, " ")}" → ${boats ? "told apart" : "NOT told apart"}`);
-  if (!boats) problems.push("ฝ้าย 18/25 not told apart");
+  const b22 = shown.get(22)!;
+  const b15 = shown.get(15)!;
+  const boats = new RegExp(`ฝ้าย[\\s\\S]*${nomineeById.get(22)!.group}`).test(b22.laneText) && new RegExp(`ฝ้าย[\\s\\S]*${nomineeById.get(15)!.group}`).test(b15.laneText);
+  log.push(`ฝ้าย: no.22 lane ${b22.slot + 1} "${b22.laneText.replace(/\s+/g, " ")}" · no.15 lane ${b15.slot + 1} "${b15.laneText.replace(/\s+/g, " ")}" → ${boats ? "told apart" : "NOT told apart"}`);
+  if (!boats) problems.push("ฝ้าย 22/15 not told apart");
 
-  // 4. tie 18 = 25: watch their lanes for 17 s (covers a 15 s resync) while others get votes
+  // 4. tie 22 = 15: watch their lanes for 17 s (covers a 15 s resync) while others get votes
   const snapNow = await snapshot();
   const v = new Map(snapNow.counts);
-  if (v.get(18) !== v.get(25)) problems.push(`setup: 18 (${v.get(18)}) and 25 (${v.get(25)}) not tied`);
-  const ahead = snapNow.order.indexOf(18) < snapNow.order.indexOf(25) ? 18 : 25;
-  const behind = ahead === 18 ? 25 : 18;
+  if (v.get(22) !== v.get(15)) problems.push(`setup: 22 (${v.get(22)}) and 15 (${v.get(15)}) not tied`);
+  const ahead = snapNow.order.indexOf(22) < snapNow.order.indexOf(15) ? 22 : 15;
+  const behind = ahead === 22 ? 15 : 22;
   let swaps = 0;
   let samples = 0;
   const watchUntil = Date.now() + 17_000;
-  const others = [1, 2, 29, 3, 22];
+  const others = [1, 2, 29, 3, 18];
   let k = 0;
   while (Date.now() < watchUntil) {
     if (k < others.length && Date.now() > watchUntil - 16_000 + k * 1500) void vote(others[k++]);
@@ -220,7 +221,7 @@ async function main() {
     if (s.get(ahead)!.slot > s.get(behind)!.slot) swaps++;
     await sleep(100);
   }
-  log.push(`tie 18 = 25 (${v.get(18)} each): ${samples} samples over 17 s incl. a resync + ${others.length} other votes → ${ahead} (reached it first) above ${behind} every time: ${swaps === 0}`);
+  log.push(`tie 22 = 15 (${v.get(22)} each): ${samples} samples over 17 s incl. a resync + ${others.length} other votes → ${ahead} (reached it first) above ${behind} every time: ${swaps === 0}`);
   if (swaps) problems.push(`tie swapped ${swaps} times`);
   await checkMatchesDb(page, "after tie watch");
 

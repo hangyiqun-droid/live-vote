@@ -13,7 +13,7 @@ export async function resetDemo(): Promise<{ ok: boolean; steps: number; failed:
   let steps = 0;
   const run = async (a: AdminAction) => {
     steps++;
-    const r = await runAdminAction(a);
+    const r = await runAdminAction(a, { internal: true });
     if (!r.ok) failed.push(`${a.action}${"award_id" in a ? ` ${a.award_id}` : ""}: ${r.error}`);
   };
 

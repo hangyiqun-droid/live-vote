@@ -86,7 +86,7 @@ async function main() {
   const sheet = page.getByRole("dialog");
   await sheet.waitFor();
   const sheetText = (await sheet.innerText()).replace(/\s+/g, " ");
-  if (!sheetText.includes("วรรณพร") || !sheetText.includes("RUBY")) problems.push(`sheet text: ${sheetText}`);
+  if (!sheetText.includes("วรรณพร") || !sheetText.includes("AMBER")) problems.push(`sheet text: ${sheetText}`);
   await page.screenshot({ path: `${OUT}/vote-confirm.jpg`, quality: 70 });
 
   expectNetErrors = true;
@@ -109,9 +109,9 @@ async function main() {
   await page.screenshot({ path: `${OUT}/vote-success.jpg`, quality: 70 });
   expectNetErrors = false;
   const after = await dbTotal();
-  const delta25 = (after.counts.get(25) ?? 0) - (before.counts.get(25) ?? 0);
-  log.push(`lost reply + retry: stored on 1st try (total ${before.total}→${mid.total}), retry answered counted, total now ${after.total} · ฝ้าย RUBY +${delta25}`);
-  if (delta25 !== 1 || after.total !== before.total + 1) problems.push("retry counted more than once");
+  const delta15 = (after.counts.get(15) ?? 0) - (before.counts.get(15) ?? 0);
+  log.push(`lost reply + retry: stored on 1st try (total ${before.total}→${mid.total}), retry answered counted, total now ${after.total} · ฝ้าย AMBER +${delta15}`);
+  if (delta15 !== 1 || after.total !== before.total + 1) problems.push("retry counted more than once");
 
   await page.reload();
   await page.getByText("คุณโหวต").waitFor();

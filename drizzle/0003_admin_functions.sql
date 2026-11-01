@@ -115,7 +115,7 @@ END
 $$;
 --> statement-breakpoint
 
--- MC renames an award while the real names are not in yet (allowed in any status)
+-- MC renames an award (allowed in any status)
 CREATE OR REPLACE FUNCTION set_award_title(p_award smallint, p_title text, p_subtitle text) RETURNS jsonb
 LANGUAGE plpgsql AS $$
 DECLARE

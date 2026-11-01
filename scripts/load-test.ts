@@ -28,7 +28,7 @@
 // same request_id. Every resend is counted and printed; no 5xx answer is ever retried away silently.
 // Needs in .env.local: STAGE_KEY, ADMIN_PASSCODE (same values as the target). Optional:
 // VERCEL_AUTOMATION_BYPASS_SECRET for a protected preview. Ably quota is per *account* —
-// never run this during the real event.
+// never run this during a live event.
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { config } from "dotenv";

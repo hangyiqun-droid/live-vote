@@ -289,7 +289,7 @@ async function main() {
   await stage.locator('[data-reveal="1"]').waitFor({ timeout: 8000 });
   check(true, "undo lobby → award 1 back on screen (final picture, no replay)");
 
-  // ---- award 2: tie at 1st (the two ฝ้าย), plus a reset on the way ----
+  // ---- award 2: tie at 1st, plus a reset on the way ----
   await openAward(admin, 2, 0);
   await votes(2, [[5, 1]]);
   await hold(admin, card(admin, 2).getByRole("button", { name: "ปิดโหวต" }));
