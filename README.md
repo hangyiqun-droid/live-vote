@@ -12,7 +12,7 @@
 ![Postgres](https://img.shields.io/badge/Postgres-Neon-00e599)
 ![Realtime: Ably](https://img.shields.io/badge/realtime-Ably-ff5416)
 
-**[▶ Try the live demo](DEMO_URL)** · host passcode `DEMO_PASSCODE`
+**[▶ Try the live demo](https://live-vote-demo.vercel.app)** · host passcode `demo-host-2026` · [big screen](https://live-vote-demo.vercel.app/stage?k=demo-stage-2026)
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Ftlejay%2Flive-vote&project-name=live-vote&repository-name=live-vote&env=DATABASE_URL,DATABASE_URL_UNPOOLED,ABLY_API_KEY,ADMIN_PASSCODE,ADMIN_SESSION_SECRET,DEVICE_SALT,STAGE_KEY,NEXT_PUBLIC_VOTE_URL)
 
@@ -177,7 +177,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[MIT](LICENSE) © the maintainer Maintainer. Sound effects and music are CC0, with sources in [`public/audio/CREDITS.md`](public/audio/CREDITS.md).
+[MIT](LICENSE) © Tle Jakapong. Sound effects and music are CC0, with sources in [`public/audio/CREDITS.md`](public/audio/CREDITS.md).
 
 <div align="center">
 
