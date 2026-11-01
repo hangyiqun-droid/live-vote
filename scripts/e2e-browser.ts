@@ -109,9 +109,9 @@ async function main() {
   await page.screenshot({ path: `${OUT}/vote-success.jpg`, quality: 70 });
   expectNetErrors = false;
   const after = await dbTotal();
-  const delta22 = (after.counts.get(22) ?? 0) - (before.counts.get(22) ?? 0);
-  log.push(`lost reply + retry: stored on 1st try (total ${before.total}→${mid.total}), retry answered counted, total now ${after.total} · ฝ้าย RUBY +${delta22}`);
-  if (delta22 !== 1 || after.total !== before.total + 1) problems.push("retry counted more than once");
+  const delta25 = (after.counts.get(25) ?? 0) - (before.counts.get(25) ?? 0);
+  log.push(`lost reply + retry: stored on 1st try (total ${before.total}→${mid.total}), retry answered counted, total now ${after.total} · ฝ้าย RUBY +${delta25}`);
+  if (delta25 !== 1 || after.total !== before.total + 1) problems.push("retry counted more than once");
 
   await page.reload();
   await page.getByText("คุณโหวต").waitFor();

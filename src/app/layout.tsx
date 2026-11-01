@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Noto_Sans_Thai } from "next/font/google";
+import { EVENT_TITLE } from "@/data/nominees";
 import "./globals.css";
 
 const notoThai = Noto_Sans_Thai({
@@ -9,8 +10,8 @@ const notoThai = Noto_Sans_Thai({
 });
 
 export const metadata: Metadata = {
-  title: "โหวตรางวัล · Founders Awards Night 2026",
-  description: "โหวตสดในงาน Founders Awards Night 2026",
+  title: `โหวตรางวัล · ${EVENT_TITLE}`,
+  description: `โหวตสดในงาน ${EVENT_TITLE}`,
   robots: { index: false, follow: false },
 };
 

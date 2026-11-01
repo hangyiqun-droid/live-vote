@@ -12,8 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // QA keeps its own throwaway probe scripts next to the evidence they produced
-    "docs/qa/evidence/**",
+    ".e2e-out/**",
+    "load-results/**",
   ]),
 ]);
 
