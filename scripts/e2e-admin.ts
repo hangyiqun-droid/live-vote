@@ -1,8 +1,8 @@
-// M3 acceptance with headless system Chrome: the MC page drives all 5 awards pending → revealed
+// Admin page acceptance with headless system Chrome: the MC page drives all 5 awards pending → revealed
 // while the stage (1920×1080) and a phone (390×844) follow live — no page is ever reloaded.
 // Covers: wrong passcode, every "กดผิด" undo, hide counts, lobby, hall, backup QR, rename, reset,
 // the MC timer + auto close, and reveal scenes for: plain 1/2/3 · equal scores at 1st, 2nd and 3rd
-// (first to the score ranks higher) · no votes. The phone must never receive a count. Screenshots → docs/qa/evidence/m3/.
+// (first to the score ranks higher) · no votes. The phone must never receive a count. Screenshots → $E2E_OUT/admin (default .e2e-out/admin).
 // Usage (dev branch only): pnpm build && pnpm start -p 3157 &  then  pnpm e2e:admin [baseUrl]
 import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -12,11 +12,11 @@ import { chromium, type Locator, type Page } from "playwright-core";
 
 config({ path: ".env.local", quiet: true });
 
-const base = (process.argv[2] ?? "http://localhost:3157").replace(/\/$/, "") + "";
+const base = (process.argv[2] ?? "http://localhost:3157").replace(/\/$/, "") + (process.env.NEXT_PUBLIC_BASE_PATH ?? "");
 const K = process.env.STAGE_KEY ?? "";
 const PASS = process.env.ADMIN_PASSCODE ?? "";
-const OUT = process.env.E2E_OUT ?? "docs/qa/evidence/m3";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const OUT = process.env.E2E_OUT ?? ".e2e-out/admin";
+const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const problems: string[] = [];
 let stagePage: Page | null = null;
@@ -160,7 +160,7 @@ async function main() {
     ws.on("framereceived", (f) => {
       const s = typeof f.payload === "string" ? f.payload : f.payload.toString("utf8");
       // `hide_counts` is a status flag, not a count — match the tally's own keys/channel only
-      if (/\\?"(counts|total)\\?"\s*:|event:tally/.test(s)) {
+      if (/\\?"(counts|total)\\?"\s*:|lv:tally/.test(s)) {
         phoneLeaks++;
         problems.push(`phone ws frame: ${s.slice(0, 160)}`);
       }
@@ -184,7 +184,7 @@ async function main() {
   check((await admin.locator("[data-award]").count()) === 0, "wrong passcode shows no controls");
   await admin.screenshot({ path: `${OUT}/admin-login-wrong.jpg`, quality: 82 });
 
-  // M5: a guest on the same venue IP guesses until locked — the MC's browser must still get in
+  // A guest on the same venue IP guesses until locked — the MC's browser must still get in
   const guestCtx = await mk({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true });
   const guest = await guestCtx.newPage();
   await guest.goto(`${base}/admin`);
@@ -219,7 +219,7 @@ async function main() {
   for (const b of [{ action: "hide", on: false }, { action: "hall", on: false }, { action: "qr_fallback", on: false }, { action: "lobby" }]) await api(b);
 
   await stage.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
-  await stage.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
+  await stage.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen
   await phone.goto(`${base}/`);
   await stage.getByText("รอพิธีกรเปิดรางวัลแรก").waitFor({ timeout: 20000 });
   // A reload would wipe this marker — checked at the end ("ไม่รีเฟรชหน้าใดเลย")
@@ -239,7 +239,7 @@ async function main() {
   await seen(phone, "รางวัลนี้ยังไม่เปิดโหวต", "phone: pending message");
   check(await card(admin, 1).getByRole("button", { name: "เปิดโหวต" }).isDisabled(), "open stays disabled until the MC picks a timer");
   await openAward(admin, 1, 90);
-  await seen(phone, "ปุ้ย", "phone switches to the voting grid by itself");
+  await seen(phone, "มะลิ", "phone switches to the voting grid by itself");
   check(await card(admin, 2).getByRole("button", { name: "เปิดโหวต" }).isDisabled(), "another award cannot open while award 1 is open (button)");
   const another = await api({ action: "open", award_id: 2, seconds: 0 });
   check(another.status() === 409 && (await another.json()).error === "another_open", "another award cannot open while award 1 is open (server)");
@@ -289,7 +289,7 @@ async function main() {
   await stage.locator('[data-reveal="1"]').waitFor({ timeout: 8000 });
   check(true, "undo lobby → award 1 back on screen (final picture, no replay)");
 
-  // ---- award 2: tie at 1st (the two ดิว), plus a reset on the way ----
+  // ---- award 2: tie at 1st (the two ฝ้าย), plus a reset on the way ----
   await openAward(admin, 2, 0);
   await votes(2, [[5, 1]]);
   await hold(admin, card(admin, 2).getByRole("button", { name: "ปิดโหวต" }));

@@ -1,4 +1,4 @@
-// M3: MC session + the new state functions, against the Neon dev branch in rolled-back transactions
+// MC session + the new state functions, against the Neon dev branch in rolled-back transactions
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Client } from "pg";
 import { pgUrl } from "@/db/pg-url";
@@ -40,7 +40,7 @@ const db = new Client({ connectionString: pgUrl(process.env.DATABASE_URL_UNPOOLE
 const fn = async <T,>(sql: string, params: unknown[] = []) => (await db.query(sql, params)).rows[0].r as T;
 const state = () => fn<EventState>("select event_state() as r");
 
-describe("M3 state functions", () => {
+describe("state functions", () => {
   beforeAll(() => db.connect());
   afterAll(() => db.end());
   beforeEach(async () => {

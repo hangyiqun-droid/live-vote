@@ -1,9 +1,9 @@
-// Read-only smoke test after a deploy (scripts/prod-setup.md step 6). Never votes, never logs in,
-// never changes state — safe on production and through the example rewrite.
+// Read-only smoke test after a deploy. Never votes, never logs in, never changes state —
+// safe on production.
 //
-//   pnpm smoke https://live-vote-demo.vercel.app [--version v0.5.0-build005]
-//   pnpm smoke https://vote.example.com              (the rewrite: same checks under )
+//   pnpm smoke https://your-app.example.com [--version v1.0.0-build001]
 //
+// NEXT_PUBLIC_BASE_PATH (env, optional) when the app is served under a sub-path.
 // VERCEL_AUTOMATION_BYPASS_SECRET (env, optional) for a protected preview.
 export {};
 const argv = process.argv.slice(2);
@@ -14,7 +14,9 @@ if (!origin) {
   console.error("usage: pnpm smoke <https://host> [--version vX.Y.Z-buildNNN]");
   process.exit(2);
 }
-const base = `${origin}`;
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+const COOKIE_PATH = new RegExp(`Path=${(BASE_PATH || "/").replace(/[/]/g, "\\/")}(;|$)`, "i");
+const base = `${origin}${BASE_PATH}`;
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;
 const problems: string[] = [];
 const check = (ok: boolean, what: string) => {
@@ -47,7 +49,7 @@ async function main() {
   for (const p of ["", "/stage", "/admin"]) {
     const r = await get(p);
     pages[p] = await r.text();
-    check(r.status === 200, `GET ${p} → 200 (got ${r.status})`);
+    check(r.status === 200, `GET ${BASE_PATH}${p} → 200 (got ${r.status})`);
   }
 
   const state = await get("/api/state");
@@ -61,26 +63,26 @@ async function main() {
   check((await get("/api/realtime/token?role=admin")).status === 401, "MC Ably token without a session → 401");
   const overview = await get("/api/admin/overview");
   check(overview.status === 401, "MC overview without a session → 401");
-  const tag = (overview.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("event_login="));
-  check(!!tag && /Path=\/event\/vote/i.test(tag) && /HttpOnly/i.test(tag), "MC login tag cookie issued (Path=, HttpOnly)");
+  const tag = (overview.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("lv_login="));
+  check(!!tag && COOKIE_PATH.test(tag) && /HttpOnly/i.test(tag), `MC login tag cookie issued (Path=${BASE_PATH || "/"}, HttpOnly)`);
 
   const mobile = await get("/api/realtime/token");
   const tr = (await mobile.json().catch(() => ({}))) as { capability?: string };
   const cap = tr.capability ? (JSON.parse(tr.capability) as Record<string, string[]>) : {};
-  check(mobile.status === 200 && Object.keys(cap).join() === "event:event", `phone Ably token can only hear event:event (${Object.keys(cap).join() || "none"})`);
+  check(mobile.status === 200 && Object.keys(cap).join() === "lv:event", `phone Ably token can only hear lv:event (${Object.keys(cap).join() || "none"})`);
 
   const dev = await get("/api/device", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-  const devCookie = (dev.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("event_dev="));
+  const devCookie = (dev.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("lv_dev="));
   check(
-    dev.status === 200 && !!devCookie && /Path=\/event\/vote/i.test(devCookie) && /HttpOnly/i.test(devCookie),
-    `device cookie event_dev set on ${new URL(origin).hostname} (Path=, HttpOnly${/Secure/i.test(devCookie ?? "") ? ", Secure" : ", NOT Secure"})`,
+    dev.status === 200 && !!devCookie && COOKIE_PATH.test(devCookie) && /HttpOnly/i.test(devCookie),
+    `device cookie lv_dev set on ${new URL(origin).hostname} (Path=${BASE_PATH || "/"}, HttpOnly${/Secure/i.test(devCookie ?? "") ? ", Secure" : ", NOT Secure"})`,
   );
   if (origin.startsWith("https:")) check(/Secure/i.test(devCookie ?? ""), "device cookie is Secure on https");
 
   // Every JS chunk the three pages load: no server secret may ever be inside
   const chunks = new Set<string>();
   for (const html of Object.values(pages)) {
-    for (const m of html.matchAll(/["'](\/event\/vote\/_next\/static\/[^"']+\.js)["']/g)) chunks.add(m[1]);
+    for (const m of html.matchAll(new RegExp(`["'](${BASE_PATH.replace(/[/]/g, "\\/")}\\/_next\\/static\\/[^"']+\\.js)["']`, "g"))) chunks.add(m[1]);
   }
   let leaks = 0;
   for (const c of chunks) {
@@ -95,7 +97,7 @@ async function main() {
   check(chunks.size > 0 && leaks === 0, `no secret pattern in ${chunks.size} JS chunks`);
   for (const [p, html] of Object.entries(pages)) {
     const hit = SECRET_PATTERNS.find(([, re]) => re.test(html));
-    check(!hit, `no secret pattern in ${p} HTML${hit ? ` (${hit[0]})` : ""}`);
+    check(!hit, `no secret pattern in ${BASE_PATH}${p || "/"} HTML${hit ? ` (${hit[0]})` : ""}`);
   }
 
   console.log(problems.length ? `\nFAILED ${problems.length}` : "\nALL PASS");

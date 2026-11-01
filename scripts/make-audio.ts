@@ -1,5 +1,4 @@
-// Builds the stage sound files from the downloaded CC0 sources (SPEC 6.1–6.2, credits in
-// public/audio/CREDITS.md): trims each source, evens out loudness, joins every effect into one
+// Builds the stage sound files from the downloaded CC0 sources// public/audio/CREDITS.md): trims each source, evens out loudness, joins every effect into one
 // sprite, and turns the two music beds into seamless loops. Writes .webm (Opus) + .mp3 and the
 // sprite map src/app/stage/sound/sprite.ts.
 // Usage: pnpm audio <folder with the source files named as in RECIPE / BGM>  (needs ffmpeg)
@@ -89,7 +88,7 @@ function main() {
   const root = resolve(__dirname, "..");
   const outDir = join(root, "public/audio");
   mkdirSync(outDir, { recursive: true });
-  const tmp = mkdtempSync(join(tmpdir(), "event-audio-"));
+  const tmp = mkdtempSync(join(tmpdir(), "live-vote-audio-"));
 
   try {
     // 1) each effect → its own normalised stereo WAV

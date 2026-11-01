@@ -1,10 +1,10 @@
 // First-load weight of a page: HTML + every <script src> / stylesheet it references, gzip-compressed
-// (SPEC 4.2 "≤ 150 KB"). Lazy chunks (Ably SDK) are not referenced by the HTML, so they are excluded.
+//. Lazy chunks (Ably SDK) are not referenced by the HTML, so they are excluded.
 // Usage: pnpm build && pnpm start -p 3156 &  then  pnpm bundle [baseUrl] [path...]
 //   e.g. pnpm bundle http://localhost:3156 / /stage
 import { gzipSync } from "node:zlib";
 
-const base = (process.argv[2] ?? "http://localhost:3156").replace(/\/$/, "") + "";
+const base = (process.argv[2] ?? "http://localhost:3156").replace(/\/$/, "") + (process.env.NEXT_PUBLIC_BASE_PATH ?? "");
 const paths = process.argv.slice(3).length ? process.argv.slice(3) : ["/"];
 
 const gz = (b: Buffer) => gzipSync(b, { level: 9 }).length;

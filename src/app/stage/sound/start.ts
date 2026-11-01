@@ -1,4 +1,4 @@
-// What the "เริ่มงาน" press does (SPEC 4.1, 6.3). Everything that needs a user gesture —
+// What the "เริ่มงาน" press does. Everything that needs a user gesture —
 // the AudioContext, full screen, the wake lock — starts synchronously inside the click.
 import { SoundEngine } from "./engine";
 

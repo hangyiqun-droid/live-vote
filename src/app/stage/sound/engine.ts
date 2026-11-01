@@ -1,4 +1,4 @@
-// Stage sound player on the plain Web Audio API (SPEC 6). One sprite of effects + two music
+// Stage sound player on the plain Web Audio API. One sprite of effects + two music
 // loops, three buses (music / effects / reveal scene) into a limiter so a storm of votes can
 // never clip. Scenes stay unaware of it: they fire cue("…") and this listens (./cues).
 import { withBase } from "@/lib/base-path";
@@ -19,7 +19,7 @@ export type Settings = { muted: boolean; music: boolean; master: number; bgm: nu
 export type EngineState = "loading" | "running" | "blocked" | "failed";
 
 export const DEFAULTS: Settings = { muted: false, music: true, master: 0.8, bgm: 0.55, sfx: 0.8, show: 0.9 };
-const STORE = "event:sound";
+const STORE = "lv:sound";
 const MUSIC_FADE_S = 1.5;
 const HUSH_LEVEL = 0.15; // music during the reveal scene, under the drumroll
 const HUSH_HOLD_MS = 5500; // after the applause starts, bring the music back

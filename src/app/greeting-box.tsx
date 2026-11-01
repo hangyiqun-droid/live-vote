@@ -7,7 +7,7 @@ import { GREETING_GAP_SECONDS, GREETING_MAX_CHARS } from "@/lib/types";
 import { fetchWithTimeout, uuid4 } from "@/lib/uuid";
 import { loadDeviceId } from "./vote-store";
 
-// fix9: send a short hello to the big screen while the lobby is up. Anonymous, nothing is kept.
+// send a short hello to the big screen while the lobby is up. Anonymous, nothing is kept.
 // Validation is done in code (never the browser's own popup); the server re-checks all of it.
 
 type Problem = { kind: "input" | "send"; text: string; retry?: boolean };

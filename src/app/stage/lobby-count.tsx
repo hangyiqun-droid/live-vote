@@ -6,7 +6,7 @@ import { cue } from "./cues";
 import { Count } from "./count";
 import s from "./stage.module.css";
 
-// "สแกนแล้ว N คน" — big enough to read from the back of the room (fix9). The number counts up with
+// "สแกนแล้ว N คน" — big enough to read from the back of the room. The number counts up with
 // the shared <Count> tween (toLocaleString th-TH), the block pops, a ring spreads, and a soft tick
 // plays for each new face. `value` null = the first reading has not arrived yet.
 export function LobbyCount({ value }: { value: number | null }) {

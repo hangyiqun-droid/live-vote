@@ -4,11 +4,11 @@ import { Pool } from "pg";
 import { pgUrl } from "./pg-url";
 import { isConnectionError, isRetryable, retryDelay, type RetryPolicy } from "./retry";
 
-// Fluid Compute: one pooled TCP pool per instance (SPEC 1.1 #8)
-const globalForPool = globalThis as unknown as { eventPool?: Pool };
+// Fluid Compute: one pooled TCP pool per instance
+const globalForPool = globalThis as unknown as { lvPool?: Pool };
 
 export const pool =
-  globalForPool.eventPool ??
+  globalForPool.lvPool ??
   new Pool({
     connectionString: pgUrl(process.env.DATABASE_URL),
     max: 5,
@@ -18,8 +18,8 @@ export const pool =
     keepAlive: true,
   });
 
-if (!globalForPool.eventPool) {
-  globalForPool.eventPool = pool;
+if (!globalForPool.lvPool) {
+  globalForPool.lvPool = pool;
   attachDatabasePool(pool);
   // An idle client dropped by Neon (pooler restart, compute scaling) emits "error" on the pool;
   // unhandled, that event would crash the whole instance and every request in flight on it.
@@ -31,7 +31,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Calls one SQL function returning jsonb, e.g. callFn("cast_vote", [1, 2, hash, id]).
 // Each call is one autocommit statement, so a transient DB error (deadlock, out of memory,
-// too many connections, a dropped socket) is retried before the route answers 503 (QA v0.5.1).
+// too many connections, a dropped socket) is retried before the route answers 503.
 // "always" is for functions that are safe to run twice (cast_vote keys on request_id, status
 // changes answer "unchanged"); "rolled-back" only retries when Postgres says nothing committed.
 export async function callFn<T>(fn: string, args: unknown[] = [], policy: RetryPolicy = "always"): Promise<T> {

@@ -1,4 +1,4 @@
-// Lobby greetings waiting for a free bubble slot (fix9). Module-level so the realtime feed (which
+// Lobby greetings waiting for a free bubble slot. Module-level so the realtime feed (which
 // lives in the stage shell) can hand messages to the bubbles (which only exist on the lobby scene).
 import type { Greeting } from "@/lib/types";
 

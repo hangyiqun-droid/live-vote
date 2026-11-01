@@ -1,14 +1,14 @@
--- fix3: one lock order for every function that writes both tables — events (id = 1) first, then awards.
+-- One lock order for every function that writes both tables — events (id = 1) first, then awards.
 -- Additive only: CREATE OR REPLACE with the same signatures as 0001/0003.
 --
--- Audit of every PL/pgSQL function (v0.5.2):
+-- Audit of every PL/pgSQL function :
 --   set_award_status, extend_award, reset_award  events → awards                    ok (unchanged)
 --   set_current_award                             events → FK key-share on awards   ok (unchanged)
 --   set_hide_counts, set_show_hall, set_qr_fallback  events only                    ok (unchanged)
 --   cast_vote                                     awards only, never events         ok (unchanged)
 --   expire_awards                                 awards → events                   FIXED below
 --   set_award_title                               awards → events                   FIXED below
--- An expired countdown closed by a reader while the MC pressed a button deadlocked (fix2 report).
+-- An expired countdown closed by a reader while the MC pressed a button deadlocked.
 
 -- Close every open award whose countdown has run out. Idempotent; returns the ids it closed.
 -- Readers call this on every state fetch, so the common "nothing to close" case takes no lock at all.

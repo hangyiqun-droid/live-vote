@@ -1,4 +1,4 @@
-// MC buttons (SPEC 4.3), shared by the admin page and /api/admin/action
+// MC buttons, shared by the admin page and /api/admin/action
 export const TIMER_CHOICES = [0, 60, 90, 120] as const;
 export const EXTEND_SECONDS = 30;
 

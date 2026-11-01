@@ -4,7 +4,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 
-// SPEC 3. Business logic lives in PL/pgSQL functions (drizzle/0001_functions.sql).
+// Business logic lives in PL/pgSQL functions (drizzle/0001_functions.sql).
 
 const bytea = customType<{ data: Buffer }>({ dataType: () => "bytea" });
 
@@ -33,10 +33,10 @@ export const events = pgTable("events", {
   title: text("title").notNull(),
   currentAwardId: smallint("current_award_id").references(() => awards.id), // null = lobby
   hideCounts: boolean("hide_counts").notNull().default(false),
-  showHall: boolean("show_hall").notNull().default(false), // MC put the hall of winners on screen (M3)
-  qrFallback: boolean("qr_fallback").notNull().default(false), // stage QR points at the backup URL (SPEC 8.2)
-  greetingsOn: boolean("greetings_on").notNull().default(true), // phones may send lobby greetings (fix9)
-  // Bumps on every status/state change — orders event:event messages
+  showHall: boolean("show_hall").notNull().default(false), // MC put the hall of winners on screen
+  qrFallback: boolean("qr_fallback").notNull().default(false), // stage QR points at the backup URL
+  greetingsOn: boolean("greetings_on").notNull().default(true), // phones may send lobby greetings
+  // Bumps on every status/state change — orders lv:event messages
   version: bigint("version", { mode: "number" }).notNull().default(0),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (t) => [check("events_singleton", sql`${t.id} = 1`)]);
@@ -56,7 +56,7 @@ export const ballots = pgTable("ballots", {
   requestId: uuid("request_id").notNull(),
 }, (t) => [primaryKey({ columns: [t.awardId, t.deviceHash] })]);
 
-// Counting board — no device. last_vote_at breaks ties (SPEC 2.2, 5.3) and never leaves Postgres:
+// Counting board — no device. last_vote_at breaks ties and never leaves Postgres:
 // snapshots only carry the resulting order
 export const tallies = pgTable("tallies", {
   awardId: smallint("award_id").notNull().references(() => awards.id),
@@ -65,7 +65,7 @@ export const tallies = pgTable("tallies", {
   lastVoteAt: timestamp("last_vote_at", { withTimezone: true }), // when `votes` reached its current value
 }, (t) => [primaryKey({ columns: [t.awardId, t.nomineeId] })]);
 
-// fix9: "devices that opened the vote page" for the lobby counter. Its hash is domain-separated
+// "devices that opened the vote page" for the lobby counter. Its hash is domain-separated
 // from ballots.device_hash (HMAC of "scan:<id>"), so the two tables can never be joined. No
 // nominee, no message, no IP. last_greet_at only paces greetings (1 per device per 10 s) — the
 // greeting text itself is never stored anywhere.
@@ -74,7 +74,7 @@ export const scannedDevices = pgTable("scanned_devices", {
   lastGreetAt: timestamp("last_greet_at", { withTimezone: true }),
 });
 
-// fix9: one row. `scan_rev` moves every time the set of scanned devices changes, inside the same
+// one row. `scan_rev` moves every time the set of scanned devices changes, inside the same
 // transaction (the row is locked first), so a revision always names exactly one committed count and
 // the stage can order counts by it instead of trusting clocks. Also the lock that keeps the counter,
 // greetings pacing and reset in one order (lobby_stats → scanned_devices → greeting_requests).
@@ -83,7 +83,7 @@ export const lobbyStats = pgTable("lobby_stats", {
   scanRev: bigint("scan_rev", { mode: "number" }).notNull().default(0),
 }, (t) => [check("lobby_stats_singleton", sql`${t.id} = 1`)]);
 
-// fix9: HMAC of a greeting's random request id + when it passed the gate, kept 60 s. It lets every
+// HMAC of a greeting's random request id + when it passed the gate, kept 60 s. It lets every
 // server instance answer a retry with "sent" and enforces the app-wide greetings-per-second ceiling.
 // The text of a greeting is never here.
 export const greetingRequests = pgTable("greeting_requests", {

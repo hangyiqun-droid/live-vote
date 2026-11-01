@@ -5,7 +5,7 @@ import a from "./admin.module.css";
 
 const HOLD_MS = 1500;
 
-// Risky presses (close, reveal) = press and hold 1.5 s instead of a confirm() popup (SPEC 4.3).
+// Risky presses (close, reveal) = press and hold 1.5 s instead of a confirm() popup.
 // Works with touch, mouse and keyboard (hold Enter / Space).
 export function HoldButton({
   children,

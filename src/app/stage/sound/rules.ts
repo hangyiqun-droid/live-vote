@@ -1,4 +1,4 @@
-// Pure "how loud and how often" rules for the stage sounds (SPEC 6.4). No Web Audio here —
+// Pure "how loud and how often" rules for the stage sounds. No Web Audio here —
 // the engine asks these what to play; unit-tested in tests/sound-rules.test.ts.
 import type { SfxKey } from "./sprite";
 
@@ -48,7 +48,7 @@ export class TickRules {
   }
 }
 
-// Minimum gap between two plays of the same "moment" sound, and who beats whom (SPEC 6.4)
+// Minimum gap between two plays of the same "moment" sound, and who beats whom
 export const MIN_GAP_MS: Partial<Record<SfxKey, number>> = {
   sfx_overtake: 1500,
   sfx_leader: 1200,
@@ -72,7 +72,7 @@ export class MomentRules {
   }
 }
 
-// Sounds that push the music down by half for a moment (SPEC 6.4)
+// Sounds that push the music down by half for a moment
 export const DUCKS: ReadonlySet<SfxKey> = new Set(["sfx_overtake", "sfx_leader", "sfx_open", "sfx_close", "sfx_reveal"]);
 export const DUCK_LEVEL = 0.5;
 export const DUCK_ATTACK_S = 0.3;

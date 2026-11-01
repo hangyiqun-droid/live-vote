@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { TrophyIcon } from "@heroicons/react/24/solid";
 import { nomineeById, type Group } from "@/data/nominees";
-import { photoSrc } from "@/components/photo";
+import { Avatar } from "@/components/avatar";
 import type { AwardState, TallySnapshot } from "@/lib/types";
 import { cue, type CueKey } from "./cues";
 import { groupVars, PALETTE } from "./palette";
@@ -17,7 +17,7 @@ const TIE_NOTE = ["คะแนนเท่ากัน", "ถึงคะแน
 export type Kind = "title" | "place" | "drum" | "win" | "none";
 export type Beat = { at: number; kind: Kind; place?: Place; cues?: CueKey[] };
 
-// SPEC 5.3 (~15 s): dim → "และรางวัล … ได้แก่…" → 3rd (left) → 2nd (right) → long drumroll → winner
+// (~15 s): dim → "และรางวัล … ได้แก่…" → 3rd (left) → 2nd (right) → long drumroll → winner
 export function timeline(steps: Place[]): Beat[] {
   const beats: Beat[] = [{ at: 800, kind: "title", cues: ["sfx_drumroll"] }];
   if (!steps.length) return [...beats, { at: 3200, kind: "none" }];
@@ -32,7 +32,7 @@ export function timeline(steps: Place[]): Beat[] {
 }
 
 // The reveal scene. `play` = the MC pressed "ประกาศผล" while this screen watched; a screen that
-// loads (or reloads) on an already revealed award jumps straight to the final picture (SPEC 6.3).
+// loads (or reloads) on an already revealed award jumps straight to the final picture.
 export function Reveal({ award, tally, play }: { award: AwardState; tally: TallySnapshot | undefined; play: boolean }) {
   const pod = useMemo(() => podium(tally?.counts ?? [], tally?.order), [tally]);
   const beats = useMemo(() => timeline(pod.steps), [pod]);
@@ -41,11 +41,6 @@ export function Reveal({ award, tally, play }: { award: AwardState; tally: Tally
   // can land a moment after the "revealed" state (it used to freeze on the empty podium's 2 beats)
   const shown = play ? played : beats.length;
   const confettiRef = useRef<HTMLDivElement>(null);
-
-  // Faces in the scene use the 360 file (≤ 360×480 on screen, SPEC 5.1) — fetch them right away
-  useEffect(() => {
-    for (const p of pod.steps) new Image().src = photoSrc(p.id, 360);
-  }, [pod]);
 
   // The timeline is built from the podium, so it must not start before the tally has arrived —
   // a screen that hears "revealed" first (tallies commit every 250 ms) would otherwise schedule the
@@ -129,8 +124,7 @@ function Card({ place, big }: { place: Place; big?: boolean }) {
   return (
     <div className={big ? `${r.card} ${r.cardBig}` : r.card} style={groupVars(n.group)} data-winner={place.id}>
       <div className={r.cardPhoto}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-        <img src={photoSrc(place.id, 360)} width={big ? 360 : 240} height={big ? 480 : 320} alt={`${n.nickname} ${n.group}`} />
+        <Avatar nominee={n} size={big ? 300 : 200} ring="var(--g2)" ringPx={big ? 8 : 6} />
         {place.wonTie && (
           <p className={r.tieBand}>
             {TIE_NOTE[0]}
@@ -149,7 +143,7 @@ function Card({ place, big }: { place: Place; big?: boolean }) {
   );
 }
 
-// ~160 paper pieces in the winner's group colours, animated with transform/opacity only (SPEC 5.5)
+// ~160 paper pieces in the winner's group colours, animated with transform/opacity only
 function confetti(layer: HTMLDivElement, group: Group) {
   const colours = [...PALETTE[group], "#fde68a", "#ffffff"];
   for (let i = 0; i < 160; i++) {
@@ -173,7 +167,7 @@ function confetti(layer: HTMLDivElement, group: Group) {
   }
 }
 
-// Hall of winners (SPEC 4.1 "ทำเนียบ"): one card per award
+// Hall of winners: one card per award
 export function Hall({ awards, tallies }: { awards: AwardState[]; tallies: Record<number, TallySnapshot> }) {
   return (
     <div className={r.hall}>
@@ -204,8 +198,9 @@ function HallFace({ place }: { place: Place }) {
   const n = nomineeById.get(place.id)!;
   return (
     <div className={r.hallFace} style={groupVars(n.group)} data-winner={place.id}>
-      {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-      <img src={photoSrc(place.id, 360)} width={240} height={320} alt={`${n.nickname} ${n.group}`} />
+      <div className={r.hallPic}>
+        <Avatar nominee={n} size={210} ring="var(--g2)" ringPx={6} />
+      </div>
       <p className={r.cardNick}>{n.nickname}</p>
       <span className={r.chip}>{n.group}</span>
       {place.wonTie && (

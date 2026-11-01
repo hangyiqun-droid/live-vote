@@ -5,7 +5,7 @@ import { canTry, LOGIN_TAG_COOKIE, parseTag, recordFail, recordSuccess } from "@
 import { ensureLoginTag } from "@/lib/server/login-tag";
 import { clientIp } from "@/lib/server/rate-limit";
 
-// SPEC 4.3 + M5: wrong guesses lock the guessing *browser* (growing wait), never the venue IP —
+// wrong guesses lock the guessing *browser* (growing wait), never the venue IP —
 // see src/lib/server/login-guard.ts.
 export async function POST(req: NextRequest) {
   const ip = clientIp(req.headers);

@@ -1,4 +1,4 @@
-/* MC page (SPEC 4.3). Phone first — the MC walks around holding it — and fine on a laptop.
+/* MC page. Phone first — the MC walks around holding it — and fine on a laptop.
    Outside the Tailwind scan (globals.css) so none of this reaches the phone vote page. */
 
 .page {
@@ -446,13 +446,6 @@
   padding: 3px 0;
 }
 
-.top5 img {
-  width: 30px;
-  height: 40px;
-  border-radius: 6px;
-  object-fit: cover;
-  object-position: center 30%;
-}
 
 .rank {
   width: 22px;
@@ -629,6 +622,11 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+.pillDemo {
+  background: rgb(120 53 15 / 0.5);
+  color: #fde68a;
 }
 
 .footer {

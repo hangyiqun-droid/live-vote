@@ -1,22 +1,22 @@
 @import "tailwindcss";
 
 /* The stage styles itself with stage.module.css — keep its markup out of the shared CSS the
-   phone vote page downloads (SPEC 4.2 size budget) */
+   phone vote page downloads */
 @source not "./stage";
 @source not "./admin";
 
 @theme inline {
   --font-sans: var(--font-noto-thai), system-ui, sans-serif;
 
-  /* Group palette — placeholder until the 🎨 asset pass (SPEC 5.1) */
-  --color-amber: #d97706;
-  --color-amber-soft: #ffedd5;
-  --color-azure: #0369a1;
-  --color-azure-soft: #e0f2fe;
-  --color-jade: #047857;
-  --color-jade-soft: #d1fae5;
-  --color-ruby: #b91c1c;
-  --color-ruby-soft: #fee2e2;
+  /* Group palette (the stage and the MC page have their own copies) */
+  --color-amber-grp: #d97706;
+  --color-amber-grp-soft: #ffedd5;
+  --color-azure-grp: #0369a1;
+  --color-azure-grp-soft: #e0f2fe;
+  --color-jade-grp: #047857;
+  --color-jade-grp-soft: #d1fae5;
+  --color-ruby-grp: #b91c1c;
+  --color-ruby-grp-soft: #fee2e2;
 }
 
 body {
@@ -26,9 +26,9 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Voting grid: exactly one screen, measured without Safari's collapsing bar (SPEC 4.2) */
+/* Voting grid: exactly one screen, measured without Safari's collapsing bar */
 .vote-screen {
-  flex: none; /* a growing flex item would take its height from the 29 photos instead */
+  flex: none; /* a growing flex item would take its height from the 29 tiles instead */
   height: 100vh;
   height: 100dvh;
   overflow: hidden;

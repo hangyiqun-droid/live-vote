@@ -1,9 +1,9 @@
--- req1: equal scores are decided by who reached that score first (SPEC 5.3). Additive only:
+-- Equal scores are decided by who reached that score first. Additive only:
 -- one nullable column, CREATE OR REPLACE with the same signatures as 0001.
 --
 -- last_vote_at never leaves Postgres: snapshots carry only the resulting `order` (nominee ids), and
 -- it sits on the per-nominee board, which has no device column. ballots still has neither nominee
--- nor time (SPEC 2.2). NULL = no votes yet, or votes counted before this migration: such a row
+-- nor time. NULL = no votes yet, or votes counted before this migration: such a row
 -- ranks after anyone timed on the same score, then by nominee id.
 ALTER TABLE "tallies" ADD COLUMN "last_vote_at" timestamp with time zone;
 --> statement-breakpoint

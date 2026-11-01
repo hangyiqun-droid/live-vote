@@ -2,8 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ExclamationTriangleIcon, SignalSlashIcon } from "@heroicons/react/24/solid";
-import { nominees } from "@/data/nominees";
-import { photoSrc } from "@/components/photo";
 import { withBase } from "@/lib/base-path";
 import { createStaffFeed, type LiveStatus } from "@/lib/live/staff";
 import type { EventState, ScanCount, TallySnapshot } from "@/lib/types";
@@ -24,7 +22,7 @@ import type { LinkProps } from "./vote-panel";
 
 const RESYNC_MS = 15_000;
 const LOST_AFTER_MS = 10_000;
-const COMMIT_MS = 250; // SPEC 5.5: buffer tally messages, re-render at most 4× a second
+const COMMIT_MS = 250; // buffer tally messages, re-render at most 4× a second
 
 type Phase = "loading" | "ready" | "no_key" | "bad_key";
 
@@ -34,7 +32,7 @@ const newer = (a: TallySnapshot, b: TallySnapshot | undefined) =>
 type Moments = { open: string | null; reveal: string | null; close: string | null };
 
 // A scene plays its entrance only when this screen saw the change happen live; a screen that
-// (re)loads mid-show lands on the current picture straight away (SPEC 6.3)
+// (re)loads mid-show lands on the current picture straight away
 function detectMoments(before: EventState, after: EventState, m: Moments): Moments {
   const cur = after.awards.find((a) => a.id === after.current_award_id);
   const was = before.awards.find((a) => a.id === cur?.id);
@@ -58,7 +56,7 @@ export function StageClient(props: { link: LinkProps; linkFallback: LinkProps | 
   return demo ? <SoundDemo /> : <LiveStage {...props} />;
 }
 
-// The music bed that fits what the screen shows (SPEC 6.1)
+// The music bed that fits what the screen shows
 function musicFor(state: EventState | null): MusicKey | null {
   if (!state) return null;
   const award = state.awards.find((a) => a.id === state.current_award_id);
@@ -76,7 +74,6 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
   const [syncFailed, setSyncFailed] = useState(false);
   const [scans, setScans] = useState<ScanCount | null>(null);
   const [scansOff, setScansOff] = useState(false); // the database has no lobby counter (migration 0006 missing)
-  const [photos, setPhotos] = useState(0);
   const [seenState, setSeenState] = useState<EventState | null>(null);
   const [moments, setMoments] = useState<Moments>({ open: null, reveal: null, close: null });
   const keyRef = useRef<string | null>(null);
@@ -88,14 +85,14 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
     setClockOffset(Date.parse(next.server_now) - Date.now());
   }, []);
 
-  // Lobby counter: Postgres' clock orders the readings, so a late message never rolls it back (fix9)
+  // Lobby counter: Postgres' clock orders the readings, so a late message never rolls it back
   const applyScans = useCallback((c: ScanCount) => {
     if (typeof c?.count !== "number" || typeof c?.rev !== "number") return;
     setScans((prev) => (!prev || c.rev >= prev.rev ? c : prev));
     setScansOff(false);
   }, []);
 
-  // Keep only the newest snapshot per award — publishes can arrive out of order (SPEC 1.1 #4)
+  // Keep only the newest snapshot per award — publishes can arrive out of order
   const applyTally = useCallback((t: TallySnapshot) => {
     if (newer(t, pending.current[t.award_id])) pending.current[t.award_id] = t;
   }, []);
@@ -141,19 +138,6 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
       setSyncFailed(true);
     }
   }, [applyState, applyTally, applyScans]);
-
-  // Preload + decode all 29 faces before the first scene (SPEC 5.5)
-  useEffect(() => {
-    let done = 0;
-    for (const n of nominees) {
-      const img = new Image();
-      img.src = photoSrc(n.id, 120);
-      img
-        .decode()
-        .catch(() => undefined) // a missing face must not block the show
-        .then(() => setPhotos(++done));
-    }
-  }, []);
 
   useEffect(() => {
     const k = new URLSearchParams(window.location.search).get("k");
@@ -208,7 +192,7 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
     if (music) cue(music);
   }, [music]);
 
-  // Sits on top of every scene below; the screen keeps loading behind it (SPEC 4.1, 6.3)
+  // Sits on top of every scene below; the screen keeps loading behind it
   const sound = show.engine ? (
     <>
       <SoundNotice engine={show.engine} />
@@ -229,14 +213,11 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
     );
   }
 
-  if (!state || photos < nominees.length) {
+  if (!state) {
     return (
       <Canvas overlay={sound}>
         <div className={s.message} role="status">
           <p>{linkMain.eventTitle}</p>
-          <div className={s.progress}>
-            <div className={s.progressFill} style={{ transform: `scaleX(${photos / nominees.length})` }} />
-          </div>
           <p className={s.muted}>{syncFailed ? "เชื่อมต่อไม่สำเร็จ กำลังลองใหม่…" : "กำลังโหลด…"}</p>
         </div>
       </Canvas>
@@ -288,6 +269,8 @@ function LiveStage({ link: linkMain, linkFallback }: { link: LinkProps; linkFall
           {revealed && <Reveal key={`${award.id}:${award.round}`} award={award} tally={tally} play={playReveal} />}
         </>
       )}
+
+      {state.demo && <span className={s.demoTag}>ข้อมูลตัวอย่าง</span>}
 
       {live !== "connected" && (
         <div role="status" className={lost ? `${s.banner} ${s.bannerLost}` : s.banner}>

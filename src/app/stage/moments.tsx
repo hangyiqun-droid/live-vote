@@ -7,7 +7,7 @@ import { cue } from "./cues";
 import { fitTitle } from "./title-fit";
 import r from "./reveal.module.css";
 
-// Award just opened: its title card flies into the middle, then shrinks up into the race header (SPEC 5.2)
+// Award just opened: its title card flies into the middle, then shrinks up into the race header
 export function OpenIntro({ title, onDone }: { title: string; onDone: () => void }) {
   useEffect(() => cue("sfx_open"), []);
   return (
@@ -20,8 +20,8 @@ export function OpenIntro({ title, onDone }: { title: string; onDone: () => void
 }
 
 // Countdown side effects (the number itself is drawn in the vote panel): a sound cue for each of
-// the last 10 seconds, and at zero the stage asks the server to close the award (SPEC 3.1
-// /api/admin/expire — idempotent, the server clock decides).
+// the last 10 seconds, and at zero the stage asks the server to close the award
+// (/api/admin/expire — idempotent, the server clock decides).
 export function CountdownCues({ award, clockOffset }: { award: AwardState; clockOffset: number }) {
   const endsAt = award.auto_close_at ? Date.parse(award.auto_close_at) : null;
   const [left, setLeft] = useState<number | null>(null);

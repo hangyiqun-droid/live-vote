@@ -1,6 +1,6 @@
 "use client";
 
-// Realtime for the stage and the MC page (SPEC 1.2). Kept apart from ./index (phones) so the
+// Realtime for the stage and the MC page. Kept apart from ./index (phones) so the
 // presence plugin and the tally channel never ship in the phone vote page bundle.
 import type { ConnectionStateChange, InboundMessage, TokenParams } from "ably";
 import { withBase } from "@/lib/base-path";

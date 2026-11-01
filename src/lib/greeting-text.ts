@@ -1,4 +1,4 @@
-// Lobby greetings (fix9): cleaning, length and the swear-word filter. Pure functions, no I/O, so the
+// Lobby greetings: cleaning, length and the swear-word filter. Pure functions, no I/O, so the
 // server route and the unit tests share one set of rules. The server is the one that decides.
 import {
   ENGLISH_WORDS,

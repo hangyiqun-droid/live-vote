@@ -1,6 +1,6 @@
 import "server-only";
 import type { NextResponse } from "next/server";
-import { BASE_PATH } from "@/lib/base-path";
+import { COOKIE_PATH } from "@/lib/base-path";
 import { LOGIN_TAG_COOKIE, mintTag, parseTag } from "@/lib/server/login-guard";
 
 // Hand the browser its login tag (login-guard.ts) the moment the MC page loads, so the MC's
@@ -19,7 +19,7 @@ export function ensureLoginTag(existing: { id: string; issuedAt: number } | null
         httpOnly: true,
         secure: process.env.NODE_ENV === "production",
         sameSite: "strict",
-        path: BASE_PATH,
+        path: COOKIE_PATH,
         maxAge: 30 * 24 * 60 * 60,
       });
     },

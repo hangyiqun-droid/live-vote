@@ -1,9 +1,9 @@
 {
   "name": "live-vote",
-  "version": "0.6.1",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -p 3154",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -11,11 +11,9 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:seed": "tsx scripts/seed.ts",
-    "photos": "tsx scripts/make-photos.ts",
     "award": "tsx scripts/award.ts",
     "latency": "tsx scripts/measure-latency.ts",
     "load": "tsx scripts/load-test.ts",
-    "prod:db": "tsx scripts/prod-db.ts",
     "smoke": "tsx scripts/smoke.ts",
     "e2e": "tsx scripts/e2e-browser.ts",
     "e2e:browser": "tsx scripts/e2e-browser.ts",
@@ -23,9 +21,7 @@
     "e2e:admin": "tsx scripts/e2e-admin.ts",
     "e2e:phone": "tsx scripts/e2e-phone.ts",
     "bundle": "tsx scripts/measure-bundle.ts",
-    "shot:reveal": "tsx scripts/shot-reveal.ts",
-    "audio": "tsx scripts/make-audio.ts",
-    "sound:record": "tsx scripts/record-sound.ts"
+    "audio": "tsx scripts/make-audio.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.2.0",
@@ -51,7 +47,6 @@
     "eslint": "^9",
     "eslint-config-next": "16.4.3",
     "playwright-core": "^1.64.1",
-    "sharp": "^0.35.5",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",

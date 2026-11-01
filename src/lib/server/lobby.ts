@@ -1,13 +1,14 @@
 import "server-only";
 import { createHmac, randomUUID } from "node:crypto";
 import { callFn } from "@/db/client";
+import { isDemo } from "@/lib/demo";
 import { isMissingSchema } from "@/db/schema-missing";
 import { cleanGreeting } from "@/lib/greeting-text";
 import { GREETING_GAP_SECONDS, GREETING_MAX_PER_SECOND, type ScanCount } from "@/lib/types";
 import { greetingLane, publishScanCount } from "./ably";
 import { scanHash } from "./device";
 
-// ---- scan counter (fix9): distinct devices that opened the vote page ----
+// ---- scan counter: distinct devices that opened the vote page ----
 
 type ScanRow = ScanCount & { new?: boolean };
 
@@ -39,7 +40,7 @@ export async function resetScans(): Promise<ScanCount> {
   return { count: r.count, rev: r.rev };
 }
 
-// ---- greetings (fix9): phone → this server → Ably → stage. Never stored. ----
+// ---- greetings: phone → this server → Ably → stage. Never stored. ----
 
 export type GreetResult =
   | { result: "sent" }
@@ -58,6 +59,8 @@ const requestHash = (id: string) => {
 type Gate = { result: "ok" | "replay" | "closed" | "busy" | "too_soon"; retry_after?: number; scan?: ScanCount };
 
 export async function sendGreeting(deviceId: string, requestId: string, raw: unknown): Promise<GreetResult> {
+  // Demo deployments never put a stranger's text on the screen
+  if (isDemo()) return { result: "closed" };
   const cleaned = cleanGreeting(raw);
   if (!cleaned.ok) return { result: cleaned.reason === "bad_type" ? "empty" : cleaned.reason };
   // This instance's own queue is full: answer before the sender's slot is used up

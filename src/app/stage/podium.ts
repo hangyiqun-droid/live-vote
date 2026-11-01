@@ -1,4 +1,4 @@
-// Who stands where in the reveal scene (SPEC 5.3). Pure — unit-tested in tests/podium.test.ts.
+// Who stands where in the reveal scene. Pure — unit-tested in tests/podium.test.ts.
 // Nobody shares a place: equal scores go to whoever reached that score first.
 import { rankRows } from "./race";
 
@@ -17,7 +17,7 @@ export type Podium = {
 };
 
 export function podium(counts: Iterable<[number, number]>, order?: number[]): Podium {
-  // Zero-vote people never stand on the podium, so an award with no votes has no winner (SPEC 5.3)
+  // Zero-vote people never stand on the podium, so an award with no votes has no winner
   const rows = rankRows(counts, order).filter((r) => r.votes > 0);
   const [first = null, second = null, third = null] = rows.slice(0, 3).map(
     (r, i): Place => ({ rank: r.rank, id: r.id, votes: r.votes, wonTie: rows[i + 1]?.votes === r.votes }),

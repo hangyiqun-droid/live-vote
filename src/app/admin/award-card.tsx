@@ -16,7 +16,7 @@ import {
   TvIcon,
 } from "@heroicons/react/24/solid";
 import { nomineeById } from "@/data/nominees";
-import { photoSrc } from "@/components/photo";
+import { Avatar } from "@/components/avatar";
 import { EXTEND_SECONDS, TIMER_CHOICES, type AdminAction } from "@/lib/admin-actions";
 import { withBase } from "@/lib/base-path";
 import type { AdminTally, AwardState, AwardStatus } from "@/lib/types";
@@ -98,8 +98,7 @@ export function AwardCard({ award, tally, current, anotherOpen, clockOffset, bus
             return (
               <li key={r.id}>
                 <span className={a.rank}>{r.rank}</span>
-                {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-                <img src={photoSrc(r.id, 120)} width={30} height={40} alt="" />
+                <Avatar nominee={n} size={32} />
                 <span className={a.nick}>{n.nickname}</span>
                 <span className={`${a.chip} ${a[`g${n.group}`]}`}>{n.group}</span>
                 <span className={a.votes}>{fmt(r.votes)}</span>
@@ -242,7 +241,7 @@ function TimeLeft({ endsAt, clockOffset }: { endsAt: string; clockOffset: number
     return () => clearInterval(t);
   }, [end, clockOffset]);
   useEffect(() => {
-    // The MC page can close an expired award too (SPEC 3.1) — the server clock decides
+    // The MC page can close an expired award too — the server clock decides
     if (left === 0 && !asked.current) {
       asked.current = true;
       void fetch(withBase("/api/admin/expire"), { method: "POST", cache: "no-store" }).catch(() => undefined);

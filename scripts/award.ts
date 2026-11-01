@@ -1,5 +1,5 @@
-// Dev-only MC stand-in until the admin page lands in M3. Calls the same Postgres functions the
-// admin API will call, then announces the new state on Ably.
+// Dev-only MC stand-in for the admin page. Calls the same Postgres functions the
+// admin API calls, then announces the new state on Ably.
 // Usage (dev branch only):
 //   pnpm award open <id> [seconds]   pnpm award close <id>   pnpm award reveal <id>
 //   pnpm award reset <id>            pnpm award current <id|lobby>   pnpm award hide on|off

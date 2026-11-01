@@ -4,7 +4,7 @@ import { useLayoutEffect, useRef } from "react";
 
 const fmt = (n: number) => n.toLocaleString("th-TH");
 
-// Number that counts up to its new value (SPEC 5.2). React never owns the text node — the tween
+// Number that counts up to its new value. React never owns the text node — the tween
 // writes textContent directly, so a burst of votes does not re-render anything per frame.
 export function Count({ value, hidden, className }: { value: number; hidden?: boolean; className?: string }) {
   const el = useRef<HTMLSpanElement>(null);
@@ -15,7 +15,7 @@ export function Count({ value, hidden, className }: { value: number; hidden?: bo
     if (!node) return;
     if (hidden) {
       node.textContent = "?";
-      shown.current = 0; // un-hiding counts up from 0 to the real value (SPEC 4.1)
+      shown.current = 0; // un-hiding counts up from 0 to the real value
       return;
     }
     const from = shown.current ?? value;

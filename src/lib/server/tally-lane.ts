@@ -1,7 +1,7 @@
 // Per-award publish lane for tally snapshots (kept free of Ably so tests can drive it with a fake).
 //
-// Why (QA v0.5.0, P1): Ably refuses more than 50 messages/s on one channel (error 42913
-// "channel.maxRate", measured on the dev app 30 Oct 2026). From Vercel sin1 a publish round trip is
+// Why: Ably refuses more than 50 messages/s on one channel (error 42913
+// "channel.maxRate", measured on a free-tier app). From Vercel sin1 a publish round trip is
 // a few ms, so one instance coalescing "one in flight at a time" still sent well over 50/s in a
 // rush — and several instances add up. The newest snapshots were refused, the old code retried
 // once *immediately* (same refused second) and gave up, so the stage sat on an older total until

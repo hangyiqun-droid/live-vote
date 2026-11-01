@@ -12,20 +12,21 @@ export type AwardState = {
   round: number;
 };
 
-// event:event — no counts, safe for phones
+// lv:event — no counts, safe for phones
 export type EventState = {
   version: number;
   title: string;
   current_award_id: number | null;
   hide_counts: boolean;
   show_hall: boolean; // MC put the hall of winners on screen
-  qr_fallback: boolean; // stage QR shows the backup URL (SPEC 8.2)
-  greetings_on: boolean; // MC switch: phones may send lobby greetings, the stage shows them (fix9)
+  qr_fallback: boolean; // stage QR shows the backup URL
+  greetings_on: boolean; // MC switch: phones may send lobby greetings, the stage shows them
+  demo?: boolean; // DEMO_MODE deployment: screens show a "sample data" tag and greetings stay off
   server_now: string;
   awards: AwardState[];
 };
 
-// event:tally — stage only
+// lv:tally — stage only
 export type TallySnapshot = {
   award_id: number;
   seq: number;
@@ -34,7 +35,7 @@ export type TallySnapshot = {
   auto_close_at: string | null;
   total: number;
   counts: [number, number][];
-  order: number[]; // nominee ids, final ranking incl. tie-break (SPEC 5.3) — the times stay in Postgres
+  order: number[]; // nominee ids, final ranking incl. tie-break — the times stay in Postgres
 };
 
 // MC page: every award's tally plus the ballot/tally cross-check (verify_tallies)
@@ -47,13 +48,13 @@ export type VoteResult =
   | { result: "not_open"; status: AwardStatus | null }
   | { result: "invalid_nominee" };
 
-export const CHANNEL_EVENT = "event:event";
-export const CHANNEL_TALLY = "event:tally";
+export const CHANNEL_EVENT = "lv:event";
+export const CHANNEL_TALLY = "lv:tally";
 
-// event:lobby — stage only (fix9). Not the vote channel, so a rush of greetings or scans can never
+// lv:lobby — stage only. Not the vote channel, so a rush of greetings or scans can never
 // eat the tally channel's 50 msg/s. `rev` is the committed revision the count belongs to (lobby_stats.scan_rev):
 // the stage keeps the highest one, so the screen always ends on the number the database holds.
-export const CHANNEL_LOBBY = "event:lobby";
+export const CHANNEL_LOBBY = "lv:lobby";
 export type ScanCount = { count: number; rev: number };
 export type Greeting = { id: string; text: string };
 // One Ably message carries a whole batch of greetings

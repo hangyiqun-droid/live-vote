@@ -1,4 +1,4 @@
-// Race ordering + change detection (SPEC 5.1, 5.2) — pure functions, no DB or network
+// Race ordering + change detection — pure functions, no DB or network
 import { describe, expect, it } from "vitest";
 import { nominees } from "@/data/nominees";
 import { photoPlace } from "@/app/stage/geometry";

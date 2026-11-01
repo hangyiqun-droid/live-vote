@@ -13,16 +13,16 @@ import { callFn } from "@/db/client";
 import { createCountPublisher, createGreetingLane } from "./lobby-lane";
 import { createTallyPublisher, type SendResult } from "./tally-lane";
 
-// Ably is only the loudspeaker; Postgres is the ballot box (SPEC 1.1).
-const globalForAbly = globalThis as unknown as { eventAbly?: Ably.Rest };
+// Ably is only the loudspeaker; Postgres is the ballot box.
+const globalForAbly = globalThis as unknown as { lvAbly?: Ably.Rest };
 
 function rest(): Ably.Rest {
-  if (!globalForAbly.eventAbly) {
+  if (!globalForAbly.lvAbly) {
     const key = process.env.ABLY_API_KEY;
     if (!key) throw new Error("ABLY_API_KEY is not set");
-    globalForAbly.eventAbly = new Ably.Rest({ key });
+    globalForAbly.lvAbly = new Ably.Rest({ key });
   }
-  return globalForAbly.eventAbly;
+  return globalForAbly.lvAbly;
 }
 
 export type Role = "mobile" | "stage" | "admin";
@@ -85,12 +85,12 @@ async function sendTally(snap: TallySnapshot): Promise<SendResult> {
 }
 
 // One lane per award per instance; kept on globalThis so dev hot reloads don't fork it
-const globalForLanes = globalThis as unknown as { eventPublishTally?: (s: TallySnapshot) => Promise<boolean> };
-export const publishTally = (globalForLanes.eventPublishTally ??= createTallyPublisher(sendTally));
+const globalForLanes = globalThis as unknown as { lvPublishTally?: (s: TallySnapshot) => Promise<boolean> };
+export const publishTally = (globalForLanes.lvPublishTally ??= createTallyPublisher(sendTally));
 
 export const publishEvent = (s: EventState) => publish(CHANNEL_EVENT, "state", s);
 
-// Lobby channel (fix9): the scan counter (newest wins) and greetings (batched). Nothing here is
+// Lobby channel: the scan counter (newest wins) and greetings (batched). Nothing here is
 // stored; a lost message only means a bubble that never appears, and the counter resyncs in 15 s.
 async function sendLobby(name: string, data: unknown): Promise<boolean> {
   try {
@@ -103,11 +103,11 @@ async function sendLobby(name: string, data: unknown): Promise<boolean> {
 }
 
 const globalForLobby = globalThis as unknown as {
-  eventPublishCount?: (c: ScanCount) => Promise<boolean>;
-  eventGreetingLane?: ReturnType<typeof createGreetingLane>;
+  lvPublishCount?: (c: ScanCount) => Promise<boolean>;
+  lvGreetingLane?: ReturnType<typeof createGreetingLane>;
 };
-export const publishScanCount = (globalForLobby.eventPublishCount ??= createCountPublisher((c) => sendLobby("count", c)));
-export const greetingLane = (globalForLobby.eventGreetingLane ??= createGreetingLane((b: GreetingBatch) => sendLobby("greet", b), {
+export const publishScanCount = (globalForLobby.lvPublishCount ??= createCountPublisher((c) => sendLobby("count", c)));
+export const greetingLane = (globalForLobby.lvGreetingLane ??= createGreetingLane((b: GreetingBatch) => sendLobby("greet", b), {
   gapMs: 300,
   maxBatch: 6,
   maxQueue: 24,

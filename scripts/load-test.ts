@@ -1,8 +1,8 @@
-// M5 load test (SPEC 7 · 1.3 · 8.2). Talks to the app only over HTTP + Ably, exactly like phones,
+// Load test. Talks to the app only over HTTP + Ably, exactly like phones,
 // the stage and the MC do — so the same script runs against local, a preview or prod.
 //
 //   pnpm load [baseUrl] [--devices 150] [--listeners 100] [--burst 100] [--tally-listeners 1]
-//             [--awards 1,2] [--out docs/qa/evidence/m5] [--reset] [--keep] [--yes]
+//             [--awards 1,2] [--out load-results] [--reset] [--keep] [--yes]
 //             [--server-log /tmp/server.log]   (local only: count "[ably] publish … failed" lines)
 //             [--spread http://localhost:3156,…]   (local only: also send votes to these instances —
 //                                                   round-robin, like Vercel spreading the room
@@ -10,8 +10,8 @@
 //             [--connections 48]   keep-alive sockets per host (0 = one fresh socket per request)
 //             [--no-retry]         report the first answer only — no phone-style resend
 //
-// 1. opens <listeners> phone connections (role mobile, event:event only) + <tally-listeners> stage
-//    connections (event:tally) through the app's own /api/realtime/token
+// 1. opens <listeners> phone connections (role mobile, lv:event only) + <tally-listeners> stage
+//    connections (lv:tally) through the app's own /api/realtime/token
 // 2. award A: <devices> phones vote at the same instant; 20 of them double-send the same request,
 //    then every phone resends (same request → "counted", no double count) and tries a second
 //    ballot (new request → "already_voted")
@@ -21,7 +21,7 @@
 //    overview) · max Ably connections · p50/p95 · 0 × 429 from one shared IP
 //
 // Everything comes from one machine = one IP, which is the venue Wi-Fi case on purpose.
-// One machine is NOT 150 phones at the TCP level, though: fix2 measured that opening ~170 new
+// One machine is NOT 150 phones at the TCP level, though: measured that opening ~170 new
 // TLS sockets at once over a phone hotspot times out even against google.com (UND_ERR_CONNECT_TIMEOUT
 // before any request reaches Vercel). So requests share a bounded keep-alive pool (warmed up
 // first), and — like the real vote page — a send that never got an answer is resent with the
@@ -46,13 +46,13 @@ const opt = (name: string, def: string) => {
   return i >= 0 && argv[i + 1] ? argv[i + 1] : def;
 };
 const origin = (argv.find((a) => !a.startsWith("--") && /^https?:/.test(a)) ?? "http://localhost:3159").replace(/\/$/, "");
-const base = `${origin}`;
+const base = `${origin}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}`;
 const DEVICES = Number(opt("devices", "150"));
 const LISTENERS = Number(opt("listeners", "100"));
 const TALLY_LISTENERS = Number(opt("tally-listeners", "1"));
 const BURST = Number(opt("burst", "100"));
 const [AWARD_A, AWARD_B] = opt("awards", "1,2").split(",").map(Number);
-const OUT = opt("out", "docs/qa/evidence/m5");
+const OUT = opt("out", "load-results");
 const DOUBLE_SEND = Math.min(20, DEVICES);
 const K = process.env.STAGE_KEY ?? "";
 const PASS = process.env.ADMIN_PASSCODE ?? "";
@@ -70,7 +70,7 @@ const dispatcher = new Agent({
   bodyTimeout: 30_000,
 });
 // Votes go round-robin over these; admin/overview/token/snapshot stay on the first one
-const voteBases = [base, ...opt("spread", "").split(",").filter(Boolean).map((o) => `${o.replace(/\/$/, "")}`)];
+const voteBases = [base, ...opt("spread", "").split(",").filter(Boolean).map((o) => `${o.replace(/\/$/, "")}${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}`)];
 let voteTurn = 0;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -148,7 +148,7 @@ async function login() {
   if (!r.ok) throw new Error(`MC login failed (${r.status}) — ADMIN_PASSCODE in .env.local must match the target`);
   adminCookie = (r.headers.getSetCookie?.() ?? [])
     .map((c) => c.split(";")[0])
-    .filter((c) => c.startsWith("event_admin="))
+    .filter((c) => c.startsWith("lv_admin="))
     .join("; ");
 }
 
@@ -288,7 +288,7 @@ function openListener(role: "mobile" | "stage"): Listener {
       const s = m.data as TallySnapshot;
       tallyMessages += 1;
       tallyArrivals.push({ at: performance.now(), snap: s });
-      // The stage keeps only the newest seq (SPEC 1.1 #4)
+      // The stage keeps only the newest seq
       if (!latestTally || s.award_id !== latestTally.award_id || s.seq > latestTally.seq) latestTally = s;
     });
   }
@@ -332,7 +332,7 @@ async function main() {
     throw new Error(`${origin} is not local — this resets awards ${AWARD_A},${AWARD_B} there. Add --yes if you mean it.`);
   }
   const started = new Date();
-  say(`# M5 load test · ${started.toISOString()}`);
+  say(`# Load test · ${started.toISOString()}`);
   say(`target ${base}${voteBases.length > 1 ? ` (votes spread over ${voteBases.length} instances)` : ""} · devices ${DEVICES} · phone listeners ${LISTENERS} · stage listeners ${TALLY_LISTENERS} · burst ${BURST}/1 s · awards ${AWARD_A},${AWARD_B}${BYPASS ? " · vercel bypass on" : ""}`);
 
   logStart = SERVER_LOG ? (await readFile(SERVER_LOG, "utf8")).split("\n").length - 1 : 0;
@@ -445,7 +445,7 @@ async function main() {
   if (viaAbly !== null) {
     check(true, `stage has the true total ${BURST} over Ably ${viaAbly.toFixed(0)} ms after the last answer (< 15 s)`);
   } else {
-    // What the real stage does every 15 s (SPEC 1.1 #5)
+    // What the real stage does every 15 s
     const snap = await stageSnapshot();
     check(snap?.total === BURST, `Ably fell short (${latestTally?.total}) — the 15 s snapshot resync has the true total ${snap?.total}`);
   }
@@ -484,7 +484,7 @@ async function main() {
 }
 
 // dirty stays true until a cleanup has really finished, so a failed attempt is tried again
-// (QA v0.5.1: a 503 during reset left the awards dirty and the finally-pass skipped them)
+// (a 503 during reset left the awards dirty and the finally-pass skipped them)
 let dirty = false;
 async function cleanup() {
   if (!dirty) return;

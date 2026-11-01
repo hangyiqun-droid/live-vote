@@ -1,8 +1,8 @@
--- fix9: lobby counter ("scanned N people") + on-screen greetings. Additive only: new tables, one
+-- Lobby counter ("scanned N people") + on-screen greetings. Additive only: new tables, one
 -- column with a default, new functions, and CREATE OR REPLACE of event_state() with the same
 -- signature as 0003 (it only gains `greetings_on`). Nothing here touches ballots, tallies or awards.
 --
--- Privacy (SPEC 2.2): scanned_devices holds an HMAC that is domain-separated from
+-- Privacy: scanned_devices holds an HMAC that is domain-separated from
 -- ballots.device_hash (the server hashes "scan:<device id>"), so the two tables have no equality
 -- key to join on. No nominee, no IP, no message. The greeting text never touches Postgres — it
 -- goes phone → server → Ably → stage. last_greet_at only paces senders; greeting_requests holds an

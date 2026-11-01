@@ -1,7 +1,7 @@
 "use client";
 
 import { GROUPS, nominees } from "@/data/nominees";
-import { photoSrc } from "@/components/photo";
+import { Avatar } from "@/components/avatar";
 import type { AwardState } from "@/lib/types";
 import { groupVars } from "./palette";
 import { WarmUp } from "./race-view";
@@ -13,7 +13,7 @@ import { COUNT_H, COUNT_TOP, QR_PX, QR_TOP, ROWS_TOP, ROW_GAP, TITLE_TOP, URL_RO
 import { QrCode, type LinkProps } from "./vote-panel";
 
 // current_award_id = null: everyone's face by group, floating slowly, QR on the right — the only
-// QR on the stage, so first-time voters can get in (SPEC 4.1 "lobby"). fix9: the right column also
+// QR on the stage, so first-time voters can get in. the right column also
 // counts the phones that scanned, and a zone under the faces shows greetings from the room. Every
 // box is placed from lobby-layout.ts, so bubbles never cover a face or the QR.
 export function Lobby({
@@ -46,8 +46,8 @@ export function Lobby({
               .filter((n) => n.group === g)
               .map((n) => (
                 <div key={n.id} className={s.lobbyFace} data-lobby-face style={{ animationDelay: `${-((n.id * 0.73) % 7)}s` }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-                  <img src={photoSrc(n.id, 120)} width={96} height={128} alt={`${n.nickname} ${n.group}`} />
+                  <Avatar nominee={n} size={96} ring="var(--g2)" />
+                  <span className={s.lobbyNick}>{n.nickname}</span>
                 </div>
               ))}
           </div>
@@ -73,7 +73,7 @@ export function Lobby({
 }
 
 // Award chosen but not open yet: the award name fills the screen, no QR — phones switch by themselves,
-// so a code here only made people rescan (SPEC 4.1 "pending")
+// so a code here only made people rescan
 export function Pending({ award, eventTitle }: { award: AwardState; eventTitle: string }) {
   return (
     <>

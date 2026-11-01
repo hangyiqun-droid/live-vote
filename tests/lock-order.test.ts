@@ -1,5 +1,5 @@
-// fix3: every function that writes both events and awards locks events first, so an expired
-// countdown closed by a reader can never deadlock with an MC action (fix2 report, 40P01).
+// every function that writes both events and awards locks events first, so an expired
+// countdown closed by a reader can never deadlock with an MC action.
 // Two sessions are needed, so unlike the other DB tests this one commits on the Neon dev branch
 // and puts award AWARD + events back the way it found them. No retries anywhere: a deadlock fails.
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -9,7 +9,7 @@ import { pgUrl } from "@/db/pg-url";
 const AWARD = 5;
 const ROUNDS = 25;
 const url = pgUrl(process.env.DATABASE_URL_UNPOOLED);
-const mk = () => new Client({ connectionString: url, application_name: "event-lock-order-test" });
+const mk = () => new Client({ connectionString: url, application_name: "lock-order-test" });
 
 const setup = mk();
 const a = mk(); // the reader closing an expired countdown
@@ -22,7 +22,7 @@ const codeOf = (e: unknown) => (e && typeof e === "object" && "code" in e ? Stri
 const settle = async (p: Promise<unknown>) => p.then(() => null, (e) => codeOf(e) || String(e));
 
 async function expiredOpen() {
-  // Nothing else open (SPEC: one award at a time), this one open with a countdown that ran out
+  // Nothing else open, this one open with a countdown that ran out
   await setup.query("update awards set status = 'closed', auto_close_at = null where status = 'open' and id <> $1", [AWARD]);
   await setup.query(
     "update awards set status = 'open', opened_at = now() - interval '1 minute', closed_at = null, revealed_at = null, auto_close_at = now() - interval '1 second' where id = $1",

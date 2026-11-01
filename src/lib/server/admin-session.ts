@@ -1,10 +1,10 @@
 import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import type { NextRequest, NextResponse } from "next/server";
-import { BASE_PATH } from "@/lib/base-path";
+import { COOKIE_PATH } from "@/lib/base-path";
 
-// SPEC 4.3: passcode from env ADMIN_PASSCODE, compared timing-safe → signed httpOnly cookie, 12 h.
-export const ADMIN_COOKIE = "event_admin";
+// passcode from env ADMIN_PASSCODE, compared timing-safe → signed httpOnly cookie, 12 h.
+export const ADMIN_COOKIE = "lv_admin";
 const SESSION_MS = 12 * 60 * 60 * 1000;
 
 function secret(): string {
@@ -52,11 +52,11 @@ export function setAdminCookie(res: NextResponse, value: string) {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "strict",
-    path: BASE_PATH,
+    path: COOKIE_PATH,
     maxAge: SESSION_MS / 1000,
   });
 }
 
 export function clearAdminCookie(res: NextResponse) {
-  res.cookies.set(ADMIN_COOKIE, "", { httpOnly: true, path: BASE_PATH, maxAge: 0 });
+  res.cookies.set(ADMIN_COOKIE, "", { httpOnly: true, path: COOKIE_PATH, maxAge: 0 });
 }

@@ -1,4 +1,4 @@
-// fix2: transient DB errors (QA v0.5.1 preview logs: "out of memory", "deadlock detected") are
+// Transient DB errors (preview logs: "out of memory", "deadlock detected") are
 // retried inside callFn before a route answers 503 — but never in a way that could run a
 // non-idempotent function twice.
 import type { PoolClient } from "pg";

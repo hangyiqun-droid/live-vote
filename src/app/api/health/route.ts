@@ -3,7 +3,7 @@ import { pool } from "@/db/client";
 import { json } from "@/lib/server/http";
 import { VERSION } from "@/version";
 
-// Wakes Neon when the stage presses "start" (SPEC 4.1) and lets ops curl the deployment
+// Wakes Neon when the stage presses "start" and lets ops curl the deployment
 export async function GET() {
   await connection();
   const started = performance.now();

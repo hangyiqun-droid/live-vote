@@ -1,8 +1,10 @@
-# Audio credits — stage sounds (SPEC 6.1–6.2)
+# Audio credits
 
-All sounds are free to use, including commercially, with no attribution required (CC0 / public domain).
-Downloaded 30 Oct 2026 (2569); the two music beds replaced 31 Oct 2026 (fix8). Built into the files below by `pnpm audio <source folder>` (`scripts/make-audio.ts`:
-trim, fades, loudness levelling, sprite + seamless loops; `pnpm audio <folder> --bgm-only` rebuilds just the music). Source files are not kept in the repo.
+Every sound and both music beds are CC0 / public domain: free to use, including commercially, with no
+attribution required. Each source page below was checked to show the CC0 licence on 1 Nov 2026.
+The files here are built from those sources by `pnpm audio <source folder>` (`scripts/make-audio.ts`:
+trim, fades, loudness levelling, one sprite for the effects, seamless loops for the music;
+`pnpm audio <folder> --bgm-only` rebuilds just the music). The source files themselves are not kept in the repo.
 
 | Shipped file | Key | Used for | Source file | Source URL | Creator | License |
 |---|---|---|---|---|---|---|
@@ -24,16 +26,10 @@ trim, fades, loudness levelling, sprite + seamless loops; `pnpm audio <folder> -
 
 - Kenney packs: the `License.txt` in each pack says "Creative Commons Zero, CC0 — free to use in personal, educational
   and commercial projects", crediting optional. Thank you, Kenney.
-- Freesound: every sound page above shows the CC0 1.0 license (checked one by one on 30 Oct 2026). Downloaded from the
-  public preview (HQ MP3) on that page.
-- OpenGameArt: each page above shows the license badge "CC0" for that work (checked on 31 Oct 2026); the files are the
-  `.mp3` links on the page, no account needed. Both tracks are cut on the beat to a whole number of bars (256 / 160
-  beats), so they loop as they are, with no crossfade.
-- Replaced (fix8, 31 Oct 2026): `Lounge Piano Loop` (#704972, NearTheAtmoshphere) and `Upbeat loop` (#512340,
-  mistermender) — both CC0 from Freesound, both too calm for the stage.
-- Listening samples and runners-up (not shipped; same site, all CC0 on the page): Urban Boss Battle (MintoDog)
-  https://opengameart.org/content/urban-boss-battle · Drum and bass (bertsz) https://opengameart.org/content/drum-and-bass
-  — see `docs/qa/evidence/fix8/`.
-- Not used: Pixabay (site blocks scripted downloads), Incompetech (CC-BY — would need on-screen credit), anything from
-  YouTube / Spotify / commercial music.
-- License text: https://creativecommons.org/publicdomain/zero/1.0/
+- Freesound: every sound page above shows the Creative Commons 0 licence. Downloaded from the public preview (HQ MP3)
+  on that page.
+- OpenGameArt: each page above shows the CC0 licence badge for that work; the files are the `.mp3` links on the page,
+  no account needed. Both tracks are cut on the beat to a whole number of bars (256 / 160 beats), so they loop as they
+  are, with no crossfade.
+- Not used: anything under a licence that needs attribution, and anything from streaming or video sites.
+- Licence text: https://creativecommons.org/publicdomain/zero/1.0/

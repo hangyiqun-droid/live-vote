@@ -1,4 +1,4 @@
-// fix9: the lobby publish lanes — a room full of phones costs a handful of Ably messages
+// the lobby publish lanes — a room full of phones costs a handful of Ably messages
 import { describe, expect, it } from "vitest";
 import { createCountPublisher, createGreetingLane } from "@/lib/server/lobby-lane";
 import type { GreetingBatch, ScanCount } from "@/lib/types";

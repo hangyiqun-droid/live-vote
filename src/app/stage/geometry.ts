@@ -1,4 +1,4 @@
-// Fixed 1920×1080 stage canvas (SPEC 4.1, 5.1). The whole canvas is scaled to the window, so
+// Fixed 1920×1080 stage canvas. The whole canvas is scaled to the window, so
 // every position here is in design pixels and can be computed without measuring the DOM.
 import { LANES } from "./race";
 
@@ -11,9 +11,9 @@ export const LANE_TOP = 168;
 export const LANE_H = 88;
 export const LANE_STEP = 94;
 
-export const PHOTO_W = 66; // 3:4, shown from the 120 px file (SPEC 5.1)
-export const PHOTO_H = 88;
-export const PHOTO_X = 120;
+export const PHOTO_W = 76; // the avatar circle's diameter
+export const PHOTO_H = 76;
+export const PHOTO_X = 114;
 
 export const BAR_X = 438;
 export const BAR_W = 580;
@@ -30,8 +30,8 @@ export const VOTE_ORIGIN = { x: RACE_W + (W - RACE_W) / 2, y: 400 };
 export const laneY = (slot: number) => LANE_TOP + slot * LANE_STEP;
 export const stripX = (slot: number) => PAD + (slot - LANES) * STRIP_STEP + (STRIP_STEP - STRIP_PHOTO_W) / 2;
 
-// Top-left of the photo plus its scale; lanes and strip share one element so it can fly between them
+// Top-left of the avatar plus its scale; lanes and strip share one element so it can fly between them
 export function photoPlace(slot: number): { x: number; y: number; s: number } {
-  if (slot < LANES) return { x: PHOTO_X, y: laneY(slot), s: 1 };
+  if (slot < LANES) return { x: PHOTO_X, y: laneY(slot) + (LANE_H - PHOTO_H) / 2, s: 1 };
   return { x: stripX(slot), y: STRIP_TOP + 4, s: STRIP_SCALE };
 }

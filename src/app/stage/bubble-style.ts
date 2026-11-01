@@ -1,8 +1,8 @@
-// How a greeting bubble looks (fix10): colours, tilt and the font-size ladder. Pure data + two pure
+// How a greeting bubble looks: colours, tilt and the font-size ladder. Pure data + two pure
 // functions, so tests/greeting-tones.test.ts can check the contrast and the stage code stays about layout.
 
 // Fill runs left → right from c1 to c2, text colour is ink. The bright ends of the four group palettes
-// (AMBER amber, AZURE sky, JADE green, RUBY rose), neighbours blended in so each bubble is a gradient.
+// (amber, sky, green, rose), neighbours blended in so each bubble is a gradient.
 export const TONES = [
   { c1: "#fde047", c2: "#fb923c", ink: "#2b1403" }, // AMBER
   { c1: "#67e8f9", c2: "#60a5fa", ink: "#04223a" }, // AZURE

@@ -1,8 +1,8 @@
-// M2 acceptance on the race screen with headless system Chrome at 1920×1080 (fresh temp profile).
-// 1. 100 votes in 10 s while recording frames + a DevTools trace (SPEC 5.5)
+// Race screen acceptance with headless system Chrome at 1920×1080 (fresh temp profile).
+// 1. 100 votes in 10 s while recording frames + a DevTools trace
 // 2. every lane/strip position on screen = ranking from the DB (strip climbers land in the right lane)
-// 3. the two "ดิว" are told apart · 4. tied scores never swap lanes · 5. hide mode freezes the order
-// Screenshots of every state go to docs/qa/evidence/m2/.
+// 3. the two "ฝ้าย" are told apart · 4. tied scores never swap lanes · 5. hide mode freezes the order
+// Screenshots of every state go to $E2E_OUT/stage (default .e2e-out/stage).
 // Usage (dev branch only): pnpm build && pnpm start -p 3156 &  then  pnpm e2e:stage [baseUrl]
 import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -16,10 +16,10 @@ import type { TallySnapshot } from "../src/lib/types";
 
 config({ path: ".env.local", quiet: true });
 
-const base = (process.argv[2] ?? "http://localhost:3156").replace(/\/$/, "") + "";
+const base = (process.argv[2] ?? "http://localhost:3156").replace(/\/$/, "") + (process.env.NEXT_PUBLIC_BASE_PATH ?? "");
 const K = process.env.STAGE_KEY ?? "";
-const OUT = process.env.E2E_OUT ?? "docs/qa/evidence/m2";
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const OUT = process.env.E2E_OUT ?? ".e2e-out/stage";
+const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const AWARD = 1;
 
 const problems: string[] = [];
@@ -45,7 +45,7 @@ async function vote(nominee: number) {
   if (j.result !== "counted") problems.push(`vote for ${nominee}: ${j.result}`);
 }
 
-// 100 votes: lanes 1–10 warm up, then strip people climb (incl. both ดิว), ending with 18 and 25 tied
+// 100 votes: lanes 1–10 warm up, then strip people climb (incl. both ฝ้าย), ending with 18 and 25 tied
 function burstPlan(): number[] {
   const warm = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10].flatMap((id) => [id, id, id]); // 30
   const climb: number[] = [];
@@ -55,7 +55,7 @@ function burstPlan(): number[] {
   return [...warm, ...climb, ...tail];
 }
 
-type Placed = { id: number; slot: number; photoX: number; photoY: number; laneText: string; count: string };
+type Placed = { id: number; slot: number; avatarX: number; avatarY: number; laneText: string; count: string };
 
 async function onScreen(page: Page): Promise<Map<number, Placed>> {
   const rows = await page.$$eval("[data-nominee]", (els) =>
@@ -65,8 +65,8 @@ async function onScreen(page: Page): Promise<Map<number, Placed>> {
       return {
         id,
         slot: Number(el.getAttribute("data-slot")),
-        photoX: Math.round(photo.x),
-        photoY: Math.round(photo.y),
+        avatarX: Math.round(photo.x),
+        avatarY: Math.round(photo.y),
         laneText: (el as HTMLElement).innerText,
         count: el.querySelector(":scope > div > span:last-child")?.textContent ?? "",
       };
@@ -83,12 +83,12 @@ async function checkMatchesDb(page: Page, label: string) {
   for (const r of expected) {
     const s = shown.get(r.id);
     const p = photoPlace(r.slot);
-    if (!s || s.slot !== r.slot || Math.abs(s.photoX - p.x) > 2 || Math.abs(s.photoY - p.y) > 2) {
+    if (!s || s.slot !== r.slot || Math.abs(s.avatarX - p.x) > 2 || Math.abs(s.avatarY - p.y) > 2) {
       bad++;
       problems.push(`${label}: nominee ${r.id} expected slot ${r.slot} @${p.x.toFixed(0)},${p.y} got ${JSON.stringify(s)}`);
     }
   }
-  log.push(`${label}: total ${snap.total} · ${29 - bad}/29 nominees at the DB rank position (lane + photo)`);
+  log.push(`${label}: total ${snap.total} · ${29 - bad}/29 nominees at the DB rank position (lane + avatar)`);
   return { snap, shown };
 }
 
@@ -110,7 +110,7 @@ async function main() {
 
   // Lobby → pending → open (empty)
   await page.goto(`${base}/stage?k=${encodeURIComponent(K)}`);
-  await page.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen (SPEC 4.1)
+  await page.getByRole("button", { name: "เริ่มงาน" }).click(); // start gate: sound + full screen
   await page.getByText("รอพิธีกรเปิดรางวัลแรก").waitFor();
   await sleep(800);
   await page.screenshot({ path: `${OUT}/stage-lobby.jpg`, quality: 82 });
@@ -179,7 +179,7 @@ async function main() {
   if (worstRun > 3) problems.push(`perf: ${worstRun} consecutive frames > 32 ms`);
   if (perf.long.length) problems.push(`perf: ${perf.long.length} long task(s)`);
   await writeFile(`${OUT}/perf-frames.json`, JSON.stringify({ perfLine, frames: perf.frames, long: perf.long }));
-  // The trace records the stage URL, which carries the stage key: swap it out before it is written (QA v0.7.0 R5)
+  // The trace records the stage URL, which carries the stage key: swap it out before it is written
   let trace = await readFile(tracePath, "utf8");
   for (const k of [process.env.STAGE_KEY, process.env.STAGE_KEY && encodeURIComponent(process.env.STAGE_KEY)]) {
     if (k) trace = trace.split(k).join("REDACTED");
@@ -195,12 +195,12 @@ async function main() {
     if ((shown.get(id)?.slot ?? 99) >= 8) problems.push(`climber ${id} did not reach a lane`);
   }
 
-  // 3. two ดิว: both in lanes, each with its own group label
+  // 3. two ฝ้าย: both in lanes, each with its own group label
   const b18 = shown.get(18)!;
   const b25 = shown.get(25)!;
-  const boats = /ดิว[\s\S]*JADE/.test(b18.laneText) && /ดิว[\s\S]*RUBY/.test(b25.laneText);
-  log.push(`ดิว: no.18 lane ${b18.slot + 1} "${b18.laneText.replace(/\s+/g, " ")}" · no.25 lane ${b25.slot + 1} "${b25.laneText.replace(/\s+/g, " ")}" → ${boats ? "told apart" : "NOT told apart"}`);
-  if (!boats) problems.push("ดิว 18/25 not told apart");
+  const boats = /ฝ้าย[\s\S]*JADE/.test(b18.laneText) && /ฝ้าย[\s\S]*RUBY/.test(b25.laneText);
+  log.push(`ฝ้าย: no.18 lane ${b18.slot + 1} "${b18.laneText.replace(/\s+/g, " ")}" · no.25 lane ${b25.slot + 1} "${b25.laneText.replace(/\s+/g, " ")}" → ${boats ? "told apart" : "NOT told apart"}`);
+  if (!boats) problems.push("ฝ้าย 18/25 not told apart");
 
   // 4. tie 18 = 25: watch their lanes for 17 s (covers a 15 s resync) while others get votes
   const snapNow = await snapshot();
@@ -242,7 +242,7 @@ async function main() {
   log.push(`un-hide: no.28 now lane ${after.shown.get(28)!.slot + 1}`);
   await page.screenshot({ path: `${OUT}/stage-unhidden.jpg`, quality: 82 });
 
-  // 6. a strip nominee (13 มะลิ, 1 vote) climbs past the 6-vote lanes: badge + flying photo mid-move
+  // 6. a strip nominee (13 แจน, 1 vote) climbs past the 6-vote lanes: badge + flying avatar mid-move
   for (let i = 0; i < 6; i++) await vote(13);
   await sleep(380);
   await page.screenshot({ path: `${OUT}/stage-overtake-motion.jpg`, quality: 82 });
@@ -273,7 +273,7 @@ async function main() {
     console.error(`\n${problems.length} problem(s):\n${problems.join("\n")}`);
     process.exit(1);
   }
-  console.log("\nall M2 checks passed");
+  console.log("\nall checks passed");
 }
 
 function frameChart(frames: number[], title: string): string {

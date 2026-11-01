@@ -11,7 +11,7 @@ import type { SoundEngine } from "./engine";
 import c from "./sound.module.css";
 import { useShow } from "./use-show";
 
-// /stage?demo=sound — lets the maintainer hear every sound and the vote-storm throttling without a live
+// /stage?demo=sound — lets you hear every sound and the vote-storm throttling without a live
 // event, and record the mix to a file. Uses no data from the server.
 
 const SINGLE: [CueKey, string][] = [
@@ -130,7 +130,7 @@ function record(engine: SoundEngine): Recorder {
 
 declare global {
   interface Window {
-    eventSoundDemo?: { run: (s: Scenario) => Promise<void>; record: () => void; stop: () => Promise<string> };
+    lvSoundDemo?: { run: (s: Scenario) => Promise<void>; record: () => void; stop: () => Promise<string> };
   }
 }
 
@@ -168,13 +168,13 @@ export function SoundDemo() {
     return blob;
   };
 
-  // Hook for scripts/record-sound.ts (headless Chrome renders the evidence recording)
+  // Hook for headless Chrome, so a script can run the scenarios and record the mix
   const api = useRef({ run, startRec, stopRec });
   useEffect(() => {
     api.current = { run, startRec, stopRec };
   });
   useEffect(() => {
-    window.eventSoundDemo = {
+    window.lvSoundDemo = {
       run: (s) => api.current.run(s),
       record: () => api.current.startRec(),
       stop: async () => {
@@ -187,7 +187,7 @@ export function SoundDemo() {
       },
     };
     return () => {
-      delete window.eventSoundDemo;
+      delete window.lvSoundDemo;
     };
   }, []);
 
@@ -245,7 +245,7 @@ export function SoundDemo() {
             {rec ? "หยุดอัด" : "เริ่มอัด"}
           </button>
           {file && (
-            <a href={file} download="event-stage-sound.webm">
+            <a href={file} download="stage-sound.webm">
               ดาวน์โหลดไฟล์ที่อัด
             </a>
           )}

@@ -1,4 +1,4 @@
-// fix9: the lobby scene at 1920×1080 — bubbles must never cover a face, the QR or the counter
+// The lobby scene at 1920×1080 — bubbles must never cover a face, the QR or the counter
 import { describe, expect, it } from "vitest";
 import { fitTitle } from "@/app/stage/title-fit";
 import {
@@ -32,7 +32,7 @@ describe("lobby bounding boxes", () => {
     expect(faceRects()).toHaveLength(nominees.length);
   });
 
-  it("all six bubble slots sit inside the canvas and end before the QR column's text (fix10: 18 px for tilt and pop)", () => {
+  it("all six bubble slots sit inside the canvas and end before the QR column's text", () => {
     for (const r of slots) {
       expect(inside(r, canvasRect())).toBe(true);
       expect(r.x + r.w + 18).toBeLessThanOrEqual(RIGHT_TEXT_LEFT);
@@ -68,18 +68,18 @@ describe("lobby bounding boxes", () => {
 
 describe("backup address stays on one line", () => {
   it("the long backup URL shrinks to fit the QR column, the normal one keeps full size", () => {
-    const long = "live-vote-demo.vercel.app";
+    const long = "live-vote-demo.vercel.app/vote";
     const size = fitTitle(long, 40, URL_ROOM);
     expect(size).toBeLessThan(40);
     expect(size).toBeGreaterThanOrEqual(24); // still readable
     // the estimate the font size is based on is never wider than the room
     expect(long.length * 0.56 * size).toBeLessThanOrEqual(URL_ROOM);
-    expect(fitTitle("vote.example.com", 40, URL_ROOM)).toBe(40);
+    expect(fitTitle("vote.example.com/vote", 40, URL_ROOM)).toBe(40);
   });
 });
 
-describe("lobby QR size (SPEC 4.1: at least 360 px)", () => {
-  const urls = ["https://vote.example.com", "https://live-vote-demo.vercel.app"];
+describe("lobby QR size", () => {
+  const urls = ["https://vote.example.com/vote", "https://live-vote-demo.vercel.app/vote"];
 
   it.each(urls)("%s is drawn at least 360 px wide, in whole pixels per module, inside the reserved box", (url) => {
     const { size } = qrPath(url);

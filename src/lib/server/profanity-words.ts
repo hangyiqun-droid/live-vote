@@ -1,4 +1,4 @@
-// Word lists for the lobby greeting filter (fix9). Edit here, no code change needed elsewhere.
+// Word lists for the lobby greeting filter. Edit here, no code change needed elsewhere.
 // Matching happens on a normalised copy of the text (see greeting-text.ts): lower case, no spaces
 // or punctuation, repeated letters squeezed, common look-alike digits/symbols mapped to letters.
 

@@ -6,7 +6,7 @@ import { withBase } from "@/lib/base-path";
 import { fetchWithTimeout } from "@/lib/uuid";
 import a from "./admin.module.css";
 
-// SPEC 4.3: no browser `required` popup — checked here, message under the field
+// no browser `required` popup — checked here, message under the field
 export function Login({ version, onDone }: { version: string; onDone: () => void }) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);

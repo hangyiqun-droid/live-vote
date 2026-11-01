@@ -1,4 +1,4 @@
-// QA v0.5.0 P1: several instances publishing one award's tally must not lose the newest snapshot
+// Several instances publishing one award's tally must not lose the newest snapshot
 // to Ably's 50 msg/s per-channel ceiling. Fake Ably: sliding 1 s window, 5 ms round trip (sin1).
 import { describe, expect, it } from "vitest";
 import { createTallyPublisher, type Send } from "@/lib/server/tally-lane";

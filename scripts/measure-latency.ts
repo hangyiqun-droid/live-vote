@@ -1,4 +1,4 @@
-// M1 acceptance: time from "phone presses confirm" (POST /api/vote) to the tally message reaching
+// Latency: time from "phone presses confirm" (POST /api/vote) to the tally message reaching
 // a stage subscriber on Ably. Votes one at a time with fresh device ids into the open award.
 // Usage: pnpm latency [baseUrl] [count]   e.g. pnpm latency https://<preview>.vercel.app 20
 // Needs an open award (pnpm award open 1). Dev branch / Ably dev app only.
@@ -10,7 +10,7 @@ import { CHANNEL_TALLY, type EventState, type TallySnapshot } from "../src/lib/t
 
 config({ path: ".env.local", quiet: true });
 
-const base = (process.argv[2] ?? "http://localhost:3155").replace(/\/$/, "") + "";
+const base = (process.argv[2] ?? "http://localhost:3155").replace(/\/$/, "") + (process.env.NEXT_PUBLIC_BASE_PATH ?? "");
 const count = Number(process.argv[3] ?? 20);
 // A protected preview needs the bypass on every request (same env name as the load test)
 const BYPASS = process.env.VERCEL_AUTOMATION_BYPASS_SECRET;

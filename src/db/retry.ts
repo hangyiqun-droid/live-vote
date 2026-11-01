@@ -1,5 +1,5 @@
-// Which DB errors are worth one more try (QA v0.5.1: preview logs showed Postgres "out of memory"
-// on the 0.25 CU dev compute and one "deadlock detected" — both roll the statement back).
+// Which DB errors are worth one more try (preview logs showed Postgres "out of memory"
+// on a small dev compute and one "deadlock detected" — both roll the statement back).
 
 // Postgres reported the error itself → the statement was rolled back, nothing committed
 const ROLLED_BACK_SQLSTATE = new Set([

@@ -1,4 +1,4 @@
-// Sound hook points (SPEC 6.1). Scenes call cue("sfx_…") at the moment a sound belongs and the
+// Sound hook points. Scenes call cue("sfx_…") at the moment a sound belongs and the
 // stage tells which music bed fits the scene with cue("bgm_…"); the player (./sound/engine)
 // listens with onCue(). Before the show is started nothing listens and cues cost nothing.
 export type MusicKey = "bgm_lobby" | "bgm_voting";
@@ -21,7 +21,7 @@ export type CueKey =
 
 export type Cue = { key: CueKey; detail?: Record<string, unknown> };
 
-const EVENT = "event:cue";
+const EVENT = "lv:cue";
 let music: MusicKey | null = null;
 
 // The music bed asked for last, so a player started later joins in with the right one

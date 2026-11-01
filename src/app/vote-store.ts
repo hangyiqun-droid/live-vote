@@ -1,6 +1,6 @@
-// Phone-side memory (SPEC 2.2/2.3). "Who I picked" lives only here — the server never knows.
+// Phone-side memory. "Who I picked" lives only here — the server never knows.
 
-const DEVICE_KEY = "event_dev";
+const DEVICE_KEY = "lv_dev";
 
 export type Ballot = {
   nomineeId: number;
@@ -28,7 +28,7 @@ export const loadDeviceId = () => safeGet(DEVICE_KEY);
 export const saveDeviceId = (id: string) => safeSet(DEVICE_KEY, id);
 
 // Keyed by round so a reset award starts fresh on the phone too
-const ballotKey = (awardId: number, round: number) => `event_ballot:${awardId}:${round}`;
+const ballotKey = (awardId: number, round: number) => `lv_ballot:${awardId}:${round}`;
 
 export function loadBallot(awardId: number, round: number): Ballot | null {
   const raw = safeGet(ballotKey(awardId, round));

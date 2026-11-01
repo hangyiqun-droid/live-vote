@@ -127,7 +127,7 @@ describe("cast_vote", () => {
   });
 });
 
-describe("tie-break (SPEC 5.3)", () => {
+describe("tie-break", () => {
   // Nominees are numbered so that "first to the score" is never just the lower number
   const cast = async (plan: number[]) => {
     for (const n of plan) await vote(n, randomUUID(), randomUUID());

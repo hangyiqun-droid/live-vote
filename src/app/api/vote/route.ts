@@ -6,7 +6,7 @@ import { json, serverError } from "@/lib/server/http";
 import { allow, clientIp } from "@/lib/server/rate-limit";
 import type { VoteResult } from "@/lib/types";
 
-// Loose on purpose: the whole room shares one Wi-Fi IP (SPEC 8.2). 150 phones × (vote + a few
+// Loose on purpose: the whole room shares one Wi-Fi IP. 150 phones × (vote + a few
 // retries) stays far below this; it only stops a runaway script. The DB primary key is the guard.
 const VOTE_PER_IP_PER_MINUTE = 1200;
 
@@ -14,7 +14,7 @@ function smallInt(v: unknown): number | null {
   return typeof v === "number" && Number.isInteger(v) && v > 0 && v < 1000 ? v : null;
 }
 
-// SPEC 2.3. Never log the body — only the outcome and latency (SPEC 2.2).
+// Never log the body — only the outcome and latency.
 export async function POST(req: NextRequest) {
   const started = performance.now();
   if (!allow(`vote:${clientIp(req.headers)}`, VOTE_PER_IP_PER_MINUTE)) {
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
     const ms = Math.round(performance.now() - started);
     const snapshot = r.result === "counted" ? r.snapshot : undefined;
     if (snapshot) {
-      // M5: the vote is safe in Postgres, so the phone gets its answer now; the announcement keeps
+      // the vote is safe in Postgres, so the phone gets its answer now; the announcement keeps
       // running after the response (publishTally coalesces a rush into the newest snapshot).
       after(async () => {
         const published = await publishTally(snapshot);

@@ -1,7 +1,7 @@
 import type { CSSProperties } from "react";
 import type { Group } from "@/data/nominees";
 
-// Stage palette per group on a dark background — placeholder until the 🎨 pass (SPEC 5.1).
+// Stage palette per group on a dark background.
 // [solid, bright end of the bar gradient]
 export const PALETTE: Record<Group, [string, string]> = {
   AMBER: ["#b45309", "#f59e0b"],

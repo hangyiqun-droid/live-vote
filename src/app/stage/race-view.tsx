@@ -3,7 +3,7 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowTrendingUpIcon, FireIcon } from "@heroicons/react/24/solid";
 import { nomineeById, type Nominee } from "@/data/nominees";
-import { photoSrc } from "@/components/photo";
+import { Avatar } from "@/components/avatar";
 import type { AwardState, TallySnapshot } from "@/lib/types";
 import { Count } from "./count";
 import { cue } from "./cues";
@@ -13,7 +13,6 @@ import {
   LANE_H,
   PAD,
   PHOTO_H,
-  PHOTO_W,
   STRIP_PHOTO_W,
   STRIP_SCALE,
   STRIP_STEP,
@@ -28,7 +27,7 @@ import { fitTitle } from "./title-fit";
 import { VotePanel, type LinkProps } from "./vote-panel";
 import s from "./stage.module.css";
 
-const HIDDEN_BAR = 0.62; // every bar the same length while counts are hidden (SPEC 4.1)
+const HIDDEN_BAR = 0.62; // every bar the same length while counts are hidden
 const LONG_TITLE = 26;
 const MAX_DOTS = 8; // light dots per commit — enough to feel busy, cheap at 100 votes / 10 s
 
@@ -49,14 +48,14 @@ export function RaceView({
 }) {
   const live = useMemo(() => rankRows(tally?.counts ?? [], tally?.order), [tally]);
 
-  // Hiding freezes the lane order where it was (SPEC 4.1). A screen that loads while already
+  // Hiding freezes the lane order where it was. A screen that loads while already
   // hidden has no "where it was", so it uses nominee order instead of leaking the standings.
   const [freeze, setFreeze] = useState(() => ({ hide, rows: hide ? idOrderRows() : null }));
   if (freeze.hide !== hide) setFreeze({ hide, rows: hide ? live : null });
   const rows = (hide && freeze.rows) || live;
 
   // DOM order never changes — only transforms do. Re-ordering nodes would make the browser
-  // restart their CSS animations mid-move (seen in M2 testing as lanes jumping sideways).
+  // restart their CSS animations mid-move.
   const stable = [...rows].sort((a, b) => a.id - b.id);
 
   const total = tally?.total ?? 0;
@@ -223,7 +222,7 @@ type LaneProps = {
 };
 
 // One full lane (ranks 1–8). Kept mounted for all 29 so a climber from the strip slides and fades
-// in instead of popping (SPEC 5.1 "บินขึ้น")
+// in instead of popping
 const Lane = memo(function Lane({ n, row, frac, hide, chasing, leader, dim, register }: LaneProps) {
   const inLane = row.slot < LANES;
   const cls = [s.lane, chasing && s.chasing, leader && s.leader].filter(Boolean).join(" ");
@@ -286,8 +285,7 @@ const Photo = memo(function Photo({
       style={{ ...groupVars(n.group), transform: `translate(${p.x}px, ${p.y}px) scale(${p.s})` }}
     >
       <div ref={register(n.id, "face")} className={s.photoInner}>
-        {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP, no optimizer (SPEC 4.0) */}
-        <img src={photoSrc(n.id, 120)} width={PHOTO_W} height={PHOTO_H} alt={`${n.nickname} ${n.group}`} decoding="async" />
+        <Avatar nominee={n} size="100%" />
       </div>
     </div>
   );
@@ -320,7 +318,7 @@ const StripItem = memo(function StripItem({
 });
 
 // The first time Chrome draws each kind of effect (light dot, badge, gold lane, stamp…) the GPU
-// process compiles a pipeline for it — a 100–280 ms hitch measured in M2. Lobby and pending play
+// process compiles a pipeline for it — a 100–280 ms hitch measured in testing. Lobby and pending play
 // every effect once, almost transparent, so the first real votes do not stutter.
 export function WarmUp() {
   const parts = useRef(new Map<number, Parts>());

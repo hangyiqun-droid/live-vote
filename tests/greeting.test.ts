@@ -1,4 +1,4 @@
-// fix9: lobby counter + greetings against the Neon dev branch and the Ably dev app.
+// lobby counter + greetings against the Neon dev branch and the Ably dev app.
 // Function-level cases run in rolled-back transactions; the end-to-end ones use random devices and
 // clean up after themselves.
 import * as Ably from "ably";
@@ -27,7 +27,7 @@ describe("scan hash", () => {
   });
 });
 
-describe("parseAction (fix9)", () => {
+describe("parseAction", () => {
   it("knows the greetings switch and the counter reset, nothing sneaky", () => {
     expect(parseAction({ action: "greetings", on: false })).toEqual({ action: "greetings", on: false });
     expect(parseAction({ action: "greetings", on: "no" })).toBeNull();
@@ -157,7 +157,7 @@ describe("lobby functions (rolled back)", () => {
   });
 });
 
-describe("scan counter race (R2): the count belongs to the commit", () => {
+describe("scan counter race: the count belongs to the commit", () => {
   const url = pgUrl(process.env.DATABASE_URL_UNPOOLED);
   const A = new Client({ connectionString: url });
   const B = new Client({ connectionString: url });

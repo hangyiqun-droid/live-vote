@@ -1,4 +1,4 @@
-// Sound throttling (SPEC 6.4) and which race moments get a sound (SPEC 6.1) — pure, no audio
+// Sound throttling and which race moments get a sound — pure, no audio
 import { describe, expect, it } from "vitest";
 import { raceSound, rankRows } from "@/app/stage/race";
 import { BUS_OF, MomentRules, TICKS_PER_SEC, TickRules } from "@/app/stage/sound/rules";
@@ -102,7 +102,7 @@ describe("raceSound", () => {
 });
 
 describe("sprite", () => {
-  it("has every effect of SPEC 6.1, non-overlapping, on the right bus", () => {
+  it("has every effect of , non-overlapping, on the right bus", () => {
     const keys = ["sfx_tick", "sfx_burst", "sfx_overtake", "sfx_leader", "sfx_chase", "sfx_open", "sfx_count", "sfx_close", "sfx_drumroll", "sfx_place", "sfx_reveal", "sfx_applause"];
     expect(Object.keys(SPRITE).sort()).toEqual([...keys].sort());
     const spans = Object.values(SPRITE).sort((a, b) => a[0] - b[0]);

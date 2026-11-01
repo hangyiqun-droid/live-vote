@@ -1,4 +1,4 @@
-// fix9: what a lobby greeting must pass before it may reach the screen
+// what a lobby greeting must pass before it may reach the screen
 import { describe, expect, it } from "vitest";
 import { cleanGreeting, isBlocked, sanitize } from "@/lib/greeting-text";
 import { nominees } from "@/data/nominees";
@@ -49,7 +49,7 @@ describe("cleaning", () => {
   });
 
   it("leaves ordinary Thai greetings as typed", () => {
-    expect(sanitize("  สวัสดีชาว EVENT ครับ  ")).toBe("สวัสดีชาว EVENT ครับ");
+    expect(sanitize("  สวัสดีชาว ABC ครับ  ")).toBe("สวัสดีชาว ABC ครับ");
   });
 });
 
@@ -104,12 +104,12 @@ describe("swear-word filter (Thai + English)", () => {
   });
 });
 
-// fix9 R1 — the cases QA v0.7.0 found slipping through, written with escapes so no invisible
+// More cases that used to slip through, written with escapes so no invisible
 // character sits in this file. The filter is best effort and is not claimed to catch everything.
 const cp = (...n: number[]) => String.fromCodePoint(...n);
 const tag = (c: string) => cp(0xe0000 + c.charCodeAt(0)); // a Unicode "tag" letter: invisible
 
-describe("QA v0.7.0 probes (R1)", () => {
+describe("filter probes", () => {
   it.each([
     ["fu.ck", "fu.ck"],
     ["sh!t", "sh!t"],
@@ -190,7 +190,7 @@ describe("QA v0.7.0 probes (R1)", () => {
   });
 });
 
-// QA v0.7.0 recheck: more separators, the braille blank, and Thai words the list used to hit by accident
+// More separators, the braille blank, and Thai words the list used to hit by accident
 describe("recheck: separators and invisible blanks", () => {
   it.each([
     ["f,u,c,k", "f,u,c,k"],

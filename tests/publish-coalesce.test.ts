@@ -1,4 +1,4 @@
-// M5: a rush of votes publishes only the newest whole-tally snapshot per award (Ably dev app)
+// a rush of votes publishes only the newest whole-tally snapshot per award (Ably dev app)
 import * as Ably from "ably";
 import { afterAll, describe, expect, it } from "vitest";
 import { publishTally } from "@/lib/server/ably";

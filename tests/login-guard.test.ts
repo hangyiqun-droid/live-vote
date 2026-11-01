@@ -1,4 +1,4 @@
-// M5: a guest guessing the MC passcode on the venue Wi-Fi must never lock the MC out
+// a guest guessing the MC passcode on the venue Wi-Fi must never lock the MC out
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   canTry,

@@ -1,7 +1,7 @@
 import { withBase } from "@/lib/base-path";
 import { fetchWithTimeout } from "@/lib/uuid";
 
-// fix9: tell the server this phone opened the vote page, so the lobby counter can say "scanned N".
+// tell the server this phone opened the vote page, so the lobby counter can say "scanned N".
 // Fire and forget: a failure never shows on the phone, it just tries again a few seconds later.
 export async function registerScan(deviceId: string): Promise<void> {
   for (let attempt = 0; attempt < 3; attempt++) {

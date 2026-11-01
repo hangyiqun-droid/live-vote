@@ -1,6 +1,6 @@
 import { VoteClient } from "./vote-client";
 
-// vote.example.com — the QR points here (SPEC 4.2)
+// The vote page: the QR on the stage points here
 export default function VotePage() {
   return <VoteClient />;
 }

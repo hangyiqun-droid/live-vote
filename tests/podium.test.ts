@@ -1,4 +1,4 @@
-// SPEC 5.3: reveal order 3 → 2 → 1, equal scores go to whoever reached that score first
+// reveal order 3 → 2 → 1, equal scores go to whoever reached that score first
 import { describe, expect, it } from "vitest";
 import { podium } from "@/app/stage/podium";
 

@@ -1,4 +1,4 @@
-// fix10: the greeting bubble colours — dark text on every part of every gradient must reach 4.5:1
+// the greeting bubble colours — dark text on every part of every gradient must reach 4.5:1
 import { describe, expect, it } from "vitest";
 import { FONT_STEPS, TILTS, TONES, contrast, startStep } from "@/app/stage/bubble-style";
 

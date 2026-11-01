@@ -5,10 +5,11 @@ import type { AdminOverview, EventState } from "@/lib/types";
 import { publishEvent, publishTally } from "./ably";
 import { isMissingSchema } from "@/db/schema-missing";
 import { resetScans } from "./lobby";
-import { readEventState, readSnapshot } from "./state";
+import { isDemo } from "@/lib/demo";
+import { readEventState, readSnapshot, withDemo } from "./state";
 
-// Every MC button (SPEC 4.3). Each one maps to a single Postgres function that checks the
-// state machine (SPEC 3.1), so pressing the same button twice is harmless (idempotent).
+// Every MC button. Each one maps to a single Postgres function that checks the
+// state machine, so pressing the same button twice is harmless (idempotent).
 type FnResult = { ok: boolean; error?: string };
 
 const id = (v: unknown) => (typeof v === "number" && Number.isInteger(v) && v > 0 && v < 100 ? v : null);
@@ -85,7 +86,7 @@ async function run(a: AdminAction): Promise<FnResult> {
       // Not idempotent (+30 s each run): retry only when Postgres says nothing committed
       return callFn("extend_award", [a.award_id, EXTEND_SECONDS], "rolled-back");
     case "reset": {
-      // Typed award name is checked here too, not only on the page (SPEC 4.3)
+      // Typed award name is checked here too, not only on the page
       const state = await readEventState();
       const award = state.awards.find((x) => x.id === a.award_id);
       if (!award) return { ok: false, error: "not_found" };
@@ -99,6 +100,7 @@ async function run(a: AdminAction): Promise<FnResult> {
     case "qr_fallback":
       return callFn("set_qr_fallback", [a.on]);
     case "greetings":
+      if (isDemo()) return { ok: false, error: "demo_mode" };
       return notReady(() => callFn<FnResult>("set_greetings", [a.on]));
     case "reset_scans":
       // clears the table and tells the stage straight away
@@ -128,4 +130,7 @@ export async function runAdminAction(a: AdminAction): Promise<{ ok: true } | { o
   return { ok: true };
 }
 
-export const readAdminOverview = () => callFn<AdminOverview>("admin_overview");
+export async function readAdminOverview(): Promise<AdminOverview> {
+  const o = await callFn<AdminOverview>("admin_overview");
+  return { ...o, state: withDemo(o.state) };
+}

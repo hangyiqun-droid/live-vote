@@ -1,4 +1,4 @@
-// Lobby scene geometry on the fixed 1920×1080 stage canvas (fix9). One source for the component
+// Lobby scene geometry on the fixed 1920×1080 stage canvas. One source for the component
 // styles and for tests/lobby-layout.test.ts, so "bubbles never cover a face or the QR" is checked by
 // arithmetic, and scripts/shot-fix9.ts re-checks it against the real DOM.
 import { GROUPS, nominees } from "@/data/nominees";
@@ -21,7 +21,7 @@ export const FLOAT = 7; // faces drift ±7 px (stage.module.css `float`)
 // Right column, top to bottom
 export const COUNT_TOP = 34;
 export const COUNT_H = 236;
-export const QR_PX = 360; // at least this wide (SPEC 4.1): readable from the back of the room
+export const QR_PX = 360; // at least this wide: readable from the back of the room
 export const QR_MAX_PX = 400; // whole-module rounding may add up to one module's width (≈ 11 px); layout reserves this
 export const QR_PAD = 18;
 export const QR_TOP = 290;
@@ -29,7 +29,7 @@ export const QR_BOX = QR_MAX_PX + QR_PAD * 2;
 export const URL_ROOM = 560; // the address must stay on one line inside this width
 export const RIGHT_TEXT_LEFT = 1340; // the QR column's text (hint, address, wait line) never starts left of this; bubbles end 18 px short of it
 
-// Bubble zone: 3 columns × 2 rows of fixed slots under the faces (fix10: each slot is a speech bubble
+// Bubble zone: 3 columns × 2 rows of fixed slots under the faces (each slot is a speech bubble
 // of BUBBLE_BODY_H plus a tail of BUBBLE_TAIL_H pointing down; the tail is part of the slot)
 export const BUBBLE_COLS = 3;
 export const BUBBLE_ROWS = 2;

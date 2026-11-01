@@ -27,7 +27,7 @@ export function QrCode({ qr, px, small }: { qr: LinkProps["qr"]; px: number; sma
 
 // Right ~30%: running total, countdown, and a small rescue QR at the bottom for phones that dropped
 // out. Phones follow the MC on their own and the big QR lives on the lobby only, so this one says
-// "for lost phones" — not "everyone scan" (SPEC 4.1, fix9 follow-up). Same QR as the lobby, so the
+// "for lost phones" — not "everyone scan". Same QR as the lobby, so the
 // MC's backup-link switch swaps it too.
 export const RESCUE_QR_PX = 208;
 export const RESCUE_URL_ROOM = 500; // the address stays on one line inside this width
@@ -86,7 +86,7 @@ function Countdown({ endsAt, clockOffset }: { endsAt: number; clockOffset: numbe
   if (now === null) return null;
   const left = Math.max(0, Math.ceil((endsAt - now) / 1000));
   const text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, "0")}`;
-  // Last 10 seconds: one big number that beats every second (SPEC 5.2), in place of the clock
+  // Last 10 seconds: one big number that beats every second, in place of the clock
   if (left > 0 && left <= 10) {
     return (
       <p key={left} className={s.countdownBig} role="timer" aria-label={`เหลือ ${left} วินาที`}>

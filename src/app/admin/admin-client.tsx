@@ -48,7 +48,7 @@ function toOverview(j: Raw, prevStage: string | null, prevScans: number | null):
   };
 }
 
-// The opposite button for "กดผิด" (SPEC M3 "ทุกการกดผิดย้อนได้"). Reset and +30 s have none —
+// The opposite button for "กดผิด". Reset and +30 s have none —
 // reset is guarded by typing the award name instead.
 function inverse(act: AdminAction, before: EventState): AdminAction | null {
   const title = (id: number) => before.awards.find((x) => x.id === id);
@@ -255,6 +255,7 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
                 ? `จอใหญ่เชื่อมต่ออยู่${screens > 1 ? ` (${screens} จอ)` : ""}`
                 : "จอใหญ่ยังไม่เชื่อมต่อ"}
           </span>
+          {state.demo && <span className={`${a.pill} ${a.pillDemo}`}>ข้อมูลตัวอย่าง</span>}
           {live !== "connected" && (
             <span className={`${a.pill} ${a.pillWarn}`} role="status">
               <SignalSlashIcon aria-hidden /> การเชื่อมต่อสดหลุด — อัปเดตทุก 10 วินาที
@@ -312,13 +313,13 @@ export function AdminClient({ version, hasFallback }: { version: string; hasFall
             role="switch"
             aria-checked={state.greetings_on === true}
             className={state.greetings_on ? `${a.switch} ${a.switchOn}` : a.switch}
-            disabled={busy !== null || state.greetings_on === undefined}
+            disabled={busy !== null || state.greetings_on === undefined || state.demo === true}
             onClick={() =>
               void send({ action: "greetings", on: !state.greetings_on }, state.greetings_on ? "ปิดข้อความขึ้นจอ" : "เปิดข้อความขึ้นจอ")
             }
           >
             <ChatBubbleLeftRightIcon aria-hidden />
-            ข้อความทักทายขึ้นจอ
+            ข้อความทักทายขึ้นจอ{state.demo ? " (ปิดถาวรในระบบตัวอย่าง)" : ""}
             <span className={a.knob} aria-hidden />
           </button>
         </div>

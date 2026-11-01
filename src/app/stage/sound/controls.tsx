@@ -63,7 +63,7 @@ export function SoundNotice({ engine }: { engine: SoundEngine }) {
   return null;
 }
 
-// Hidden panel: shows up when the mouse moves, gone again 3 s later (SPEC 4.1, 6.4)
+// Hidden panel: shows up when the mouse moves, gone again 3 s later
 export function SoundControls({ engine }: { engine: SoundEngine }) {
   const [shown, setShown] = useState(false);
   const [s, setS] = useState<Settings>(engine.settings);

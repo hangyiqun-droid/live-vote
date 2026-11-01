@@ -1,4 +1,4 @@
-// One phone page stays open through all 5 awards and is never reloaded or rescanned (fix5).
+// One phone page stays open through all 5 awards and is never reloaded or rescanned.
 // The phone actually votes (the older e2e never did) and is put through what real phones do:
 // screen off 60 s (page frozen + network gone), a socket that dies silently while the client still
 // says "connected", the wake-up fetch failing, offline/online, the MC changing award during the
@@ -10,10 +10,10 @@ import { seedAwards } from "../src/data/awards";
 
 config({ path: ".env.local", quiet: true });
 
-const base = (process.argv[2] ?? "http://localhost:3155").replace(/\/$/, "") + "";
+const base = (process.argv[2] ?? "http://localhost:3155").replace(/\/$/, "") + (process.env.NEXT_PUBLIC_BASE_PATH ?? "");
 const PASS = process.env.ADMIN_PASSCODE ?? "";
 const SCREEN_OFF_MS = Number(process.env.E2E_SCREEN_OFF_MS ?? 60_000);
-const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
+const CHROME = process.env.CHROME_PATH ?? "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const FOLLOW_MS = 2_000; // brief: the phone follows the MC within 2 s while the screen is on
 const ZOMBIE_MS = 7_000; // silent socket: nothing can tell, so the 4 s check (±20%, up to 4.8 s) + a round trip
 
@@ -84,7 +84,7 @@ const titleOf = (id: number) => seedAwards[id - 1].title;
 async function expectGrid(page: Page, id: number, limit: number, what: string, timeout = 8_000) {
   try {
     await page.locator("h1", { hasText: titleOf(id) }).waitFor({ timeout });
-    await page.getByRole("button", { name: /ปุ้ย/ }).first().waitFor({ timeout });
+    await page.getByRole("button", { name: /มะลิ/ }).first().waitFor({ timeout });
     const ms = Date.now() - since;
     check(ms <= limit, `${what}: ${ms} ms (limit ${limit})`);
   } catch {
@@ -161,7 +161,7 @@ async function main() {
   await show(1);
   await open(1);
   await expectGrid(page, 1, FOLLOW_MS, "award 1: grid opens by itself");
-  await voteFor(page, /ปุ้ย/);
+  await voteFor(page, /มะลิ/);
   await close(1);
   await expectFollow(page, "ปิดโหวตรางวัลนี้แล้ว", FOLLOW_MS, "award 1: thank-you → closed by itself");
   await reveal(1);
@@ -171,7 +171,7 @@ async function main() {
   await show(2);
   await open(2);
   await expectGrid(page, 2, FOLLOW_MS, "award 2: grid opens by itself");
-  await voteFor(page, /ปุ้ย/);
+  await voteFor(page, /มะลิ/);
   silent = true;
   await close(2);
   await expectFollow(page, "ปิดโหวตรางวัลนี้แล้ว", ZOMBIE_MS, "award 2: zombie socket → closed still arrives", 40_000);
@@ -185,7 +185,7 @@ async function main() {
   await show(3);
   await open(3);
   await expectGrid(page, 3, 6_000, "award 3: grid opens by itself");
-  await voteFor(page, /ปุ้ย/);
+  await voteFor(page, /มะลิ/);
   tolerate = true;
   await screenOff(cdp, ctx, SCREEN_OFF_MS, async () => {
     await close(3);
@@ -208,7 +208,7 @@ async function main() {
 
   // ---- Award 4: MC changes award during the confirm sheet: never a vote on the wrong award ----
   const before4 = await tally();
-  await page.getByRole("button", { name: /ปุ้ย/ }).first().click();
+  await page.getByRole("button", { name: /มะลิ/ }).first().click();
   await page.getByRole("dialog").waitFor();
   await close(4);
   await expectFollow(page, "ปิดโหวตรางวัลนี้แล้ว", FOLLOW_MS, "award 4: confirm sheet → closed, sheet gone");
@@ -218,10 +218,10 @@ async function main() {
   await open(5);
   await expectGrid(page, 5, FOLLOW_MS, "award 5: grid opens by itself");
   check((await page.getByRole("dialog").count()) === 0, "award 5: the old pick does not come back as a confirm sheet");
-  check((await page.getByRole("button", { name: /ปุ้ย/ }).first().getAttribute("aria-pressed")) === "false", "award 5: no face pre-selected from award 4");
+  check((await page.getByRole("button", { name: /มะลิ/ }).first().getAttribute("aria-pressed")) === "false", "award 5: no tile pre-selected from award 4");
 
   // ---- Award 5: offline → online; then a device that already voted ----
-  await voteFor(page, /ปุ้ย/);
+  await voteFor(page, /มะลิ/);
   tolerate = true;
   await ctx.setOffline(true);
   await sleep(1_000);
@@ -259,7 +259,7 @@ async function main() {
   await show(1);
   await open(1);
   await expectGrid(lonely, 1, pollLimit, "no Ably: grid opens from polling alone", 15_000);
-  await voteFor(lonely, /ปุ้ย/);
+  await voteFor(lonely, /มะลิ/);
   await close(1);
   await expectFollow(lonely, "ปิดโหวตรางวัลนี้แล้ว", pollLimit, "no Ably: closed from polling alone", 15_000);
   await reveal(1);

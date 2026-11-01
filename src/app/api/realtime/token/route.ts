@@ -5,8 +5,8 @@ import { createTokenRequest } from "@/lib/server/ably";
 import { json, serverError } from "@/lib/server/http";
 import { isStageKey } from "@/lib/server/stage-key";
 
-// Ably token by role (SPEC 1.1 #6). Without a valid stage key you get the phone token,
-// which can only subscribe to event:event — never the tally. The MC page needs its session cookie.
+// Ably token by role. Without a valid stage key you get the phone token,
+// which can only subscribe to lv:event — never the tally. The MC page needs its session cookie.
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const role = params.get("role");

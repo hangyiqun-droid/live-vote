@@ -1,4 +1,4 @@
-// Pure ranking + change detection for the race screen (SPEC 5.1, 5.2). No React, no DOM —
+// Pure ranking + change detection for the race screen. No React, no DOM —
 // unit-tested in tests/race.test.ts.
 import { nominees } from "@/data/nominees";
 
@@ -7,7 +7,7 @@ export const LANES = 8; // Top 8 get a full lane; ranks 9–29 sit in the bottom
 export type Row = {
   id: number;
   votes: number;
-  rank: number; // slot + 1: nobody shares a place, equal scores are decided by `order` (SPEC 5.3)
+  rank: number; // slot + 1: nobody shares a place, equal scores are decided by `order`
   slot: number; // 0..28 screen position; < LANES = lane, else strip
 };
 
@@ -33,7 +33,7 @@ export function leaderOf(rows: Row[]): number | null {
   return rows.length && rows[0].votes > 0 ? rows[0].id : null;
 }
 
-// Lanes 2–8 within one vote of the lane above get the "closing in" flame (SPEC 5.2)
+// Lanes 2–8 within one vote of the lane above get the "closing in" flame
 export function chasingIds(rows: Row[]): Set<number> {
   const out = new Set<number>();
   for (let i = 1; i < Math.min(LANES, rows.length); i++) {
@@ -72,8 +72,8 @@ export function diffRows(prev: Row[], next: Row[]): RaceChange {
 
 export type RaceSound = { votes: number; moment: "sfx_leader" | "sfx_overtake" | "sfx_chase" | null };
 
-// Which sounds one commit of the race deserves (SPEC 6.1). While counts are hidden only the
-// tick plays — it tells the room votes are landing without saying for whom (SPEC 4.1).
+// Which sounds one commit of the race deserves. While counts are hidden only the
+// tick plays — it tells the room votes are landing without saying for whom.
 export function raceSound(prev: Row[], next: Row[], hide: boolean): RaceSound {
   const change = diffRows(prev, next);
   let votes = 0;

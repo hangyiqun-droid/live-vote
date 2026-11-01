@@ -1,6 +1,6 @@
 "use client";
 
-// The only place that knows about the realtime provider (SPEC 1.2). Screens use LiveFeed,
+// The only place that knows about the realtime provider. Screens use LiveFeed,
 // so swapping Ably for Neon Realtime later does not touch any page. This file is the phone side
 // (statuses only); the stage and the MC page use ./staff.
 import type { ConnectionStateChange, InboundMessage, TokenParams } from "ably";

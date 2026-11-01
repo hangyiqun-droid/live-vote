@@ -1,4 +1,4 @@
--- SPEC 2.3 / 3: all counting and state transitions happen inside Postgres,
+-- All counting and state transitions happen inside Postgres,
 -- one function call = one round trip = one transaction. Called from the server only.
 
 -- Full tally of one award (what the stage needs after reconnecting)
@@ -113,7 +113,7 @@ END
 $$;
 --> statement-breakpoint
 
--- Status machine (SPEC 3.1). Same status again = ok/unchanged (idempotent retries).
+-- Status machine. Same status again = ok/unchanged (idempotent retries).
 CREATE OR REPLACE FUNCTION set_award_status(p_award smallint, p_status award_status, p_auto_close_seconds integer DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE

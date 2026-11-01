@@ -8,7 +8,7 @@ import { json, serverError } from "@/lib/server/http";
 import { readScanCount } from "@/lib/server/lobby";
 import { expireAndRead } from "@/lib/server/state";
 
-// Everything the MC page shows: statuses, live counts of every award, verify_tallies (SPEC 4.3)
+// Everything the MC page shows: statuses, live counts of every award, verify_tallies
 export async function GET(req: NextRequest) {
   if (!isAdmin(req)) {
     // The login screen is about to show — give this browser its login tag now (login-guard.ts)

@@ -1,4 +1,4 @@
-// Publish lanes for the lobby channel (fix9), kept free of Ably so tests can drive them with a fake.
+// Publish lanes for the lobby channel, kept free of Ably so tests can drive them with a fake.
 //
 // The lobby channel is separate from the vote channel on purpose: Ably's free plan allows 50 msg/s
 // per channel, and neither the "scanned N" counter nor a burst of greetings may ever compete with

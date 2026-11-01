@@ -20,14 +20,14 @@
       "idx": 2,
       "version": "7",
       "when": 1793300076337,
-      "tag": "0002_m3_event_flags",
+      "tag": "0002_event_flags",
       "breakpoints": true
     },
     {
       "idx": 3,
       "version": "7",
       "when": 1793300076819,
-      "tag": "0003_m3_functions",
+      "tag": "0003_admin_functions",
       "breakpoints": true
     },
     {

@@ -1,7 +1,7 @@
 import "server-only";
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
-// MC login throttle (M5). The whole venue shares one Wi-Fi IP, so locking an IP would lock the MC
+// MC login throttle. The whole venue shares one Wi-Fi IP, so locking an IP would lock the MC
 // out whenever a guest guesses the passcode. Instead:
 // 1. Each browser carries a signed "login tag" cookie. Wrong guesses slow down and then lock
 //    *that browser only*, with a growing wait (no wait for the first few typos).
@@ -11,7 +11,7 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 // Memory only, per function instance — like the vote limiter, it is a speed bump, not a vault.
 // The real protection is a long random ADMIN_PASSCODE.
 
-export const LOGIN_TAG_COOKIE = "event_login";
+export const LOGIN_TAG_COOKIE = "lv_login";
 export const FREE_FAILS = 3; // typos before any wait
 const MAX_WAIT_MS = 5 * 60_000;
 const IP_WINDOW_MS = 10 * 60_000;

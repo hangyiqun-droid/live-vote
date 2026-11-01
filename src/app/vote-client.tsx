@@ -10,9 +10,9 @@ import {
   SignalSlashIcon,
   TvIcon,
 } from "@heroicons/react/24/solid";
-import { GROUPS, nomineeById, nominees, type Nominee } from "@/data/nominees";
+import { EVENT_TITLE, GROUPS, nomineeById, nominees, type Nominee } from "@/data/nominees";
 import { groupStyle } from "@/components/group";
-import { photoSrc, photoSrcSet } from "@/components/photo";
+import { Avatar } from "@/components/avatar";
 import { withBase } from "@/lib/base-path";
 import { createLiveFeed, type LiveFeed, type LiveStatus } from "@/lib/live";
 import type { AwardState, EventState } from "@/lib/types";
@@ -21,10 +21,7 @@ import { GreetingBox } from "./greeting-box";
 import { registerScan, resolveDevice } from "./scan";
 import { loadBallot, loadDeviceId, saveBallot, saveDeviceId, type Ballot } from "./vote-store";
 
-// 29 faces fit one screen (SPEC 4.2). Tiles are ~1/5 of the width, but on a tall phone cover-fit
-// scales the photo up to the tile's height, so the files are picked as if ~1/4 wide.
-const GRID_SIZES = "(max-width: 480px) calc((100vw - 16px) / 4), 116px";
-// Realtime is the main path; these only catch what it missed (SPEC 4.2). A socket can die silently
+// Realtime is the main path; these only catch what it missed. A socket can die silently
 // while Ably still says "connected" (phones do this), so a check runs even then: 4 s keeps a silent
 // socket to ~5 s stale, and 100 phones make ~25 light reads/s on /api/state (no counts, no cache).
 // Each wait gets ±20% so a room of phones does not poll in step.
@@ -84,7 +81,7 @@ export function VoteClient() {
         const id = await resolveDevice(local);
         saveDeviceId(id);
         setDeviceId(id);
-        void registerScan(id); // lobby counter (fix9)
+        void registerScan(id); // lobby counter
       } catch {
         setDeviceId(local);
         if (local) void registerScan(local);
@@ -271,7 +268,7 @@ export function VoteClient() {
 
       {s && !activeAward && <Waiting state={s} />}
 
-      {/* Greetings only while the stage shows the lobby and the MC switch is on (fix9) */}
+      {/* Greetings only while the stage shows the lobby and the MC switch is on */}
       {s && !activeAward && s.current_award_id === null && !s.show_hall && s.greetings_on === true && <GreetingBox />}
 
       {activeAward && voting && pick !== null && (
@@ -307,7 +304,8 @@ function Header({
         voting ? "px-2 pb-1.5 pt-[max(0.375rem,env(safe-area-inset-top))]" : "sticky top-0 z-10 mb-3 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))]"
       }`}
     >
-      {!voting && <p className="text-xs text-slate-300">{state?.title ?? "Founders Awards Night 2026"}</p>}
+      {state?.demo && <p className="mb-0.5 text-center text-[10px] font-bold leading-none text-amber-300">ข้อมูลตัวอย่าง</p>}
+      {!voting && <p className="text-xs text-slate-300">{state?.title ?? EVENT_TITLE}</p>}
       <div className="flex items-center justify-between gap-2">
         <h1 className={`font-extrabold leading-tight ${voting ? "text-[15px]" : "text-xl"}`}>{award ? award.title : "โหวตรางวัล"}</h1>
         {left !== null && (
@@ -322,7 +320,7 @@ function Header({
       </div>
       {voting && (
         <div className="mt-0.5 flex items-center justify-between gap-2 text-xs text-slate-300">
-          <p>แตะรูปคนที่อยากโหวตให้</p>
+          <p>แตะคนที่อยากโหวตให้</p>
           <ul className="flex shrink-0 gap-1.5" aria-hidden>
             {GROUPS.map((g) => (
               <li key={g} className="flex items-center gap-0.5 text-[9px] font-bold">
@@ -340,7 +338,7 @@ function Header({
 // Same order as the group frames read: every group stays together without section headings
 const byGroup = GROUPS.flatMap((g) => nominees.filter((n) => n.group === g));
 
-// 5 × 6 cells share whatever height is left under the header, so the page never scrolls (SPEC 4.2)
+// 5 × 6 cells share whatever height is left under the header, so the page never scrolls
 const GRID_CLASS = "grid min-h-0 flex-1 grid-cols-5 grid-rows-6 gap-1 p-1";
 
 function SkeletonGrid() {
@@ -385,17 +383,10 @@ function Tile({
         selected ? "border-amber-400 ring-2 ring-amber-400" : gs.frame
       }`}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP + srcset, no optimizer (SPEC 4.0) */}
-      <img
-        src={photoSrc(n.id, 240)}
-        srcSet={photoSrcSet(n.id)}
-        sizes={GRID_SIZES}
-        width={120}
-        height={160}
-        alt=""
-        decoding="async"
-        className={`min-h-0 w-full flex-1 object-cover object-[center_30%] ${gs.soft}`}
-      />
+      {/* The circle is as big as the tile's picture area allows (container units), so 29 fit one screen */}
+      <span className={`flex min-h-0 w-full flex-1 items-center justify-center p-1 [container-type:size] ${gs.soft}`}>
+        <Avatar nominee={n} size="min(100cqw, 100cqh)" />
+      </span>
       <span className="block w-full shrink-0 truncate px-0.5 text-xs font-bold leading-[1.4]">{n.nickname}</span>
     </button>
   );
@@ -418,16 +409,7 @@ function ConfirmSheet({
   return (
     <div className="fixed inset-0 z-20 flex items-end bg-slate-900/50" role="dialog" aria-modal="true" aria-labelledby="confirm-title">
       <div className="mx-auto w-full max-w-[480px] rounded-t-2xl bg-white px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-5 shadow-2xl motion-safe:animate-[sheet-up_200ms_ease-out]">
-        {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP (SPEC 4.2) */}
-        <img
-          src={photoSrc(n.id, 360)}
-          srcSet={photoSrcSet(n.id, [240, 360])}
-          sizes="180px"
-          width={180}
-          height={240}
-          alt={`${n.nickname} กลุ่ม ${n.group}`}
-          className={`mx-auto aspect-[3/4] w-[180px] rounded-xl object-cover object-[center_30%] ${gs.soft}`}
-        />
+        <Avatar nominee={n} size={140} className="mx-auto" />
         <p id="confirm-title" className="mt-4 text-center text-lg leading-snug">
           โหวตให้ <strong className="text-2xl">{n.nickname}</strong> ({n.firstName})
           <br />
@@ -490,16 +472,7 @@ function Done({ ballot }: { ballot: Ballot }) {
       <p className="mt-3 text-2xl font-extrabold">ส่งแล้ว! ดูคะแนนบนจอใหญ่ได้เลย</p>
       {n && (
         <div className="mt-6 flex items-center gap-3 rounded-xl bg-white p-3 shadow-sm">
-          {/* eslint-disable-next-line @next/next/no-img-element -- pre-sized WebP (SPEC 4.2) */}
-          <img
-            src={photoSrc(n.id, 240)}
-            srcSet={photoSrcSet(n.id, [120, 240, 360])}
-            sizes="72px"
-            width={72}
-            height={96}
-            alt=""
-            className="h-24 w-[72px] rounded-lg object-cover object-[center_30%]"
-          />
+          <Avatar nominee={n} size={72} />
           <p className="text-left">
             คุณโหวต <strong className="text-xl">{n.nickname}</strong>
             <br />
