@@ -47,4 +47,4 @@ export const nominees: Nominee[] = [
 
 export const nomineeById = new Map(nominees.map((n) => [n.id, n]));
 
-export const EVENT_TITLE = "Founders Awards Night 2026";
+export const EVENT_TITLE = "辩论赛";
